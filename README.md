@@ -16,8 +16,10 @@ Até o momento, os seguintes clients são suportados:
 
 # Como instalar
 
-Baixe a versão mais recente no seguinte link: httos://github.com/jafkc2/KC-Overlay/releases
+Baixe a versão mais recente no seguinte link: https://github.com/jafkc2/KC-Overlay/releases
 
 # Comunidade
 
 Possui alguma dúvida ou sugestão? Entre no nosso servidor do Discord: https://discord.gg/XK4G4Bxs
+
+### Obs: este programa ainda está em estágio inicial de desenvolvimento, então será comum encontrar bugs. Por favor relate-os no servidor do Discord ou no Github Issues, caso encontrar algum.
