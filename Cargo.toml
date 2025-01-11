@@ -3,6 +3,10 @@ name = "kc_overlay"
 version = "0.1.0"
 edition = "2021"
 
+[profile.release]
+strip = true
+lto = true
+
 [dependencies]
 iced = {version = "0.13.1", features = ["tokio"]}
 reqwest = "0.12.12"
