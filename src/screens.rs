@@ -1,6 +1,6 @@
 use iced::{
     theme,
-    widget::{button, column, container, row, text, Column},
+    widget::{button, column, container, pick_list, row, text, Column},
     Color, Renderer,
 };
 
@@ -88,9 +88,13 @@ pub fn get_screen(
             column![bar, container, bottom_row].padding(10)
         }
         Screen::Settings => {
+            use super::MineClient;
+            let clients = vec![MineClient::Default, MineClient::Badlion, MineClient::Lunar];
+            let client_select = pick_list(clients, Some(app.client.clone()), Message::ClientSelect);
+            let client_row = row![text("Client:"), client_select].spacing(10);
             let go_back = button("Voltar").on_press(Message::ChangeScreen(Screen::Main));
 
-            column![go_back].padding(10)
+            column![client_row, go_back].padding(10).spacing(10)
         }
         Screen::Welcome => {
             let welcome_text = text("Muito obrigado por usar a overlay! Selecione o client que você usa para proseguir.");

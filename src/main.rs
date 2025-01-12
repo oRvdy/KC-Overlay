@@ -8,7 +8,7 @@ use std::{
 use iced::{
     daemon::Appearance,
     event,
-    futures::{channel::mpsc, poll, SinkExt, Stream, StreamExt},
+    futures::{channel::mpsc::{self, Sender}, SinkExt, Stream, StreamExt},
     mouse::Button,
     stream,
     window::{self, Position, Settings},
@@ -58,6 +58,7 @@ struct KCOverlay {
 
 #[derive(Debug, Clone)]
 enum Message {
+    None(bool),
     ChangeScreen(Screen),
     Activation(Vec<Player>),
     Log(LogReader),
@@ -103,6 +104,8 @@ impl KCOverlay {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::None(_) => Task::none(),
+
             Message::ChangeScreen(screen) => {
                 self.screen = screen;
                 Task::none()
@@ -118,10 +121,10 @@ impl KCOverlay {
             Message::Log(log_reader) => match log_reader {
                 LogReader::Log(message) => {
                     if message.contains("[CHAT] Jogadores") {
-                        let split = message.split(':').map(|x| x.to_string());
+                        let split = message.split("):").map(|x| x.to_string());
                         let split_vector: Vec<String> = split.clone().collect();
 
-                        let str_players: Vec<String> = split_vector[4]
+                        let str_players: Vec<String> = split_vector[1]
                             .trim()
                             .replace(" ", "")
                             .replace("+", "")
@@ -190,9 +193,17 @@ impl KCOverlay {
                     .write_all(serde_json::to_string_pretty(&config).unwrap().as_bytes())
                     .unwrap();
 
-                self.screen = Screen::Main;
+                match self.screen{
+                    Screen::Welcome => self.screen = Screen::Main,
+                    _ => ()
+                }
 
-                Task::none()
+                match &self.sender {
+                    Some(sender) => {
+                        Task::perform(update_client(sender.clone(), self.client.clone()), Message::None)
+                    },
+                    None => Task::none(),
+                }
             }
         }
     }
@@ -270,6 +281,11 @@ fn read_command() -> impl Stream<Item = LogReader> {
     })
 }
 
+async fn update_client(mut sender: Sender<MineClient>, client: MineClient) -> bool{
+    sender.send(client).await.unwrap();
+    true
+}
+
 async fn get_players_info(str_players: Vec<String>) -> Vec<Player> {
     let mut players = vec![];
     let client = Client::new();
@@ -277,7 +293,7 @@ async fn get_players_info(str_players: Vec<String>) -> Vec<Player> {
     for i in str_players {
         let url = format!("{}{}", MUSH_API, i);
         let request = client.get(url).send().await.unwrap().text().await.unwrap();
-        println!("hehe..");
+        println!("Getting {i} stats...");
 
         let json: Value = match serde_json::from_str(&request) {
             Ok(ok) => ok,
@@ -428,10 +444,20 @@ impl Player {
     }
 }
 
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Clone, Debug, PartialEq)]
 enum MineClient {
     #[default]
     Default,
     Badlion,
     Lunar,
+}
+
+impl ToString for MineClient{
+    fn to_string(&self) -> String {
+        match self{
+            MineClient::Default => "Vanilla".to_string(),
+            MineClient::Badlion => "Badlion".to_string(),
+            MineClient::Lunar => "Lunar".to_string(),
+        }
+    }
 }
