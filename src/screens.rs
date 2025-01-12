@@ -108,7 +108,9 @@ pub fn get_screen(
 
             let lunar = button("Lunar").on_press(Message::ClientSelect(MineClient::Lunar));
 
-            column![welcome_text, dafault_client_row, badlion, lunar]
+            let legacy_launcher = button("Legacy Launcher").on_press(Message::ClientSelect(MineClient::LegacyLauncher));
+
+            column![welcome_text, dafault_client_row, badlion, lunar, legacy_launcher]
                 .spacing(10)
                 .padding(10)
         }

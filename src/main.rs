@@ -77,6 +77,7 @@ impl KCOverlay {
             0 => MineClient::Default,
             1 => MineClient::Badlion,
             2 => MineClient::Lunar,
+            3 => MineClient::LegacyLauncher,
             _ => MineClient::Default,
         };
 
@@ -180,6 +181,7 @@ impl KCOverlay {
                     MineClient::Default => 0,
                     MineClient::Badlion => 1,
                     MineClient::Lunar => 2,
+                    MineClient::LegacyLauncher => 3,
                 };
 
                 config["client"] = serde_json::json!(client_number);
@@ -239,6 +241,7 @@ fn read_command() -> impl Stream<Item = LogReader> {
             MineClient::Default => format!("{}/logs/latest.log", minecraft_dir),
             MineClient::Badlion => format!("{}/logs/blclient/minecraft/latest.log", minecraft_dir),
             MineClient::Lunar => util::lunar_get_newer_logs_path(),
+            MineClient::LegacyLauncher => util::get_legacy_launcher_dir(),
         };
 
         let file = File::open(&logs_path).unwrap();
@@ -266,6 +269,7 @@ fn read_command() -> impl Stream<Item = LogReader> {
                         MineClient::Default => format!("{}/logs/latest.log", minecraft_dir),
                         MineClient::Badlion => format!("{}/logs/blclient/minecraft/latest.log", minecraft_dir),
                         MineClient::Lunar => util::lunar_get_newer_logs_path(),
+                        MineClient::LegacyLauncher => util::get_legacy_launcher_dir(),
                     };
             
                     let file = File::open(&logs_path).unwrap();
@@ -450,6 +454,7 @@ enum MineClient {
     Default,
     Badlion,
     Lunar,
+    LegacyLauncher
 }
 
 impl ToString for MineClient{
@@ -458,6 +463,7 @@ impl ToString for MineClient{
             MineClient::Default => "Vanilla".to_string(),
             MineClient::Badlion => "Badlion".to_string(),
             MineClient::Lunar => "Lunar".to_string(),
+            MineClient::LegacyLauncher => "Legacy Launcher".to_string(),
         }
     }
 }

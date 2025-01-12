@@ -15,6 +15,17 @@ pub fn get_minecraft_dir() -> String {
     }
 }
 
+pub fn get_legacy_launcher_dir() -> String {
+    match std::env::consts::OS {
+        "linux" => format!("{}/.tlauncher/legacy/Minecraft/game", std::env::var("HOME").unwrap()),
+        "windows" => format!(
+            "{}/AppData/Roaming/.tlauncher/legacy/Minecraft/game",
+            std::env::var("USERPROFILE").unwrap().replace('\\', "/")
+        ),
+        _ => panic!("System not supported."),
+    }
+}
+
 pub async fn wait(time: Duration) -> bool {
     sleep(time).await;
     true
