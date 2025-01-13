@@ -19,7 +19,7 @@ Até o momento, os seguintes clients são suportados:
 
 # Como instalar
 
-Baixe a versão mais recente no seguinte link: https://github.com/jafkc2/KC-Overlay/releases
+Acesse https://github.com/jafkc2/KC-Overlay/releases/latest e selecione a versão para seu sistema operacional
 
 # Comunidade
 
