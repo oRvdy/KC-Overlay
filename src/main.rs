@@ -13,7 +13,6 @@ use iced::{
         channel::mpsc::{self, Sender},
         SinkExt, Stream, StreamExt,
     },
-    keyboard::Key,
     mouse::Button,
     stream,
     window::{self, Position, Settings},
@@ -318,13 +317,19 @@ async fn get_players_info(str_players: Vec<String>) -> Vec<Player> {
     for i in str_players {
         let url = format!("{}{}", MUSH_API, i);
         let request = match client.get(url).send().await{
-            Ok(response) => response.text().await.unwrap(),
+            Ok(response) => match response.text().await{
+                Ok(ok) => ok,
+                Err(e) =>  {
+                    println!("Failed to get text of {i}'s API response: {e}\n Skipping.");
+                    continue;
+                },
+            },
             Err(e) => {
-                println!("Failed to get {i} request: {e}\n Skipping.");
+                println!("Failed to get {i} response: {e}\n Skipping.");
                 continue;
             },
         };
-        
+
         println!("Getting {i} stats...");
 
         let json: Value = match serde_json::from_str(&request) {
