@@ -317,7 +317,14 @@ async fn get_players_info(str_players: Vec<String>) -> Vec<Player> {
     const MUSH_API: &str = "https://mush.com.br/api/player/";
     for i in str_players {
         let url = format!("{}{}", MUSH_API, i);
-        let request = client.get(url).send().await.unwrap().text().await.unwrap();
+        let request = match client.get(url).send().await{
+            Ok(response) => response.text().await.unwrap(),
+            Err(e) => {
+                println!("Failed to get {i} request: {e}\n Skipping.");
+                continue;
+            },
+        };
+        
         println!("Getting {i} stats...");
 
         let json: Value = match serde_json::from_str(&request) {
