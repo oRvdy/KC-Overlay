@@ -7,16 +7,10 @@ use std::{
 };
 
 use iced::{
-    daemon::Appearance,
-    event,
-    futures::{
+    daemon::Appearance, event, futures::{
         channel::mpsc::{self, Sender},
         SinkExt, Stream, StreamExt,
-    },
-    mouse::Button,
-    stream,
-    window::{self, Position, Settings},
-    Color, Element, Point, Size, Subscription, Task,
+    }, mouse::Button, stream, time, window::{self, Position, Settings}, Color, Element, Point, Size, Subscription, Task
 };
 use reqwest::Client;
 use screens::Screen;
@@ -70,6 +64,7 @@ enum Message {
     GotEvent(event::Event),
     Close,
     ClientSelect(MineClient),
+    ClientUpdate,
     Minimize,
 }
 
@@ -217,6 +212,15 @@ impl KCOverlay {
                 }
             }
             Message::Minimize => window::get_latest().and_then(|x| window::minimize(x, true)),
+            Message::ClientUpdate => {
+                match &self.sender {
+                    Some(sender) => Task::perform(
+                        update_client(sender.clone(), self.client.clone()),
+                        Message::None,
+                    ),
+                    None => Task::none(),
+                }
+            },
         }
     }
 
@@ -228,7 +232,11 @@ impl KCOverlay {
         let event = event::listen().map(Message::GotEvent);
         let command_reader = Subscription::run(read_command).map(Message::Log);
 
-        Subscription::batch(vec![event, command_reader])
+        // In case the user opens the game after the overlay
+        let client = self.client.clone();
+        let client_updater = time::every(Duration::from_secs(20)).map(move |_| Message::ClientUpdate);
+
+        Subscription::batch(vec![event, command_reader, client_updater])
     }
 }
 
