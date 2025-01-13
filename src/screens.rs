@@ -77,13 +77,14 @@ pub fn get_screen(
                 fkfdr_column
             ]
             .spacing(5);
-            let container = container(column_row).height(330);
+            let container = container(column_row).height(335);
 
             let settings =
                 button("Configurações").on_press(Message::ChangeScreen(Screen::Settings));
             let close = button("Sair").on_press(Message::Close);
+            let minimize = button("Minimizar").on_press(Message::Minimize);
 
-            let bottom_row = row![settings, close].spacing(20);
+            let bottom_row = row![settings, close, minimize].spacing(20);
 
             column![bar, container, bottom_row].padding(10)
         }
@@ -108,11 +109,18 @@ pub fn get_screen(
 
             let lunar = button("Lunar").on_press(Message::ClientSelect(MineClient::Lunar));
 
-            let legacy_launcher = button("Legacy Launcher").on_press(Message::ClientSelect(MineClient::LegacyLauncher));
+            let legacy_launcher = button("Legacy Launcher")
+                .on_press(Message::ClientSelect(MineClient::LegacyLauncher));
 
-            column![welcome_text, dafault_client_row, badlion, lunar, legacy_launcher]
-                .spacing(10)
-                .padding(10)
+            column![
+                welcome_text,
+                dafault_client_row,
+                badlion,
+                lunar,
+                legacy_launcher
+            ]
+            .spacing(10)
+            .padding(10)
         }
     }
 }

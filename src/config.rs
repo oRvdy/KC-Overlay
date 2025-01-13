@@ -1,4 +1,8 @@
-use std::{fs::File, io::Write, path::Path};
+use std::{
+    fs::{self, File},
+    io::Write,
+    path::Path,
+};
 
 use serde_json::Value;
 
@@ -17,7 +21,13 @@ pub fn check_config_file() -> bool {
     let file_exists = Path::new(&get_config_file_path()).exists();
     let mut conf_json = match file_exists {
         true => super::util::get_json(get_config_file_path()),
-        false => serde_json::json!({}),
+        false => {
+            let minecraft_path = super::util::get_minecraft_dir();
+            if !Path::new(&minecraft_path).exists() {
+                fs::create_dir_all(minecraft_path).unwrap()
+            }
+            serde_json::json!({})
+        }
     };
 
     let mut file = File::create(get_config_file_path()).unwrap();

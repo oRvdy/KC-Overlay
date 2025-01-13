@@ -2,13 +2,18 @@
 use std::{
     fs::{File, OpenOptions},
     io::{BufRead, BufReader, Seek, SeekFrom, Write},
+    path::Path,
     time::Duration,
 };
 
 use iced::{
     daemon::Appearance,
     event,
-    futures::{channel::mpsc::{self, Sender}, SinkExt, Stream, StreamExt},
+    futures::{
+        channel::mpsc::{self, Sender},
+        SinkExt, Stream, StreamExt,
+    },
+    keyboard::Key,
     mouse::Button,
     stream,
     window::{self, Position, Settings},
@@ -53,7 +58,7 @@ struct KCOverlay {
     players: Vec<Player>,
     loading: bool,
     client: MineClient,
-    sender: Option<mpsc::Sender<MineClient>>
+    sender: Option<mpsc::Sender<MineClient>>,
 }
 
 #[derive(Debug, Clone)]
@@ -66,6 +71,7 @@ enum Message {
     GotEvent(event::Event),
     Close,
     ClientSelect(MineClient),
+    Minimize,
 }
 
 impl KCOverlay {
@@ -93,7 +99,7 @@ impl KCOverlay {
                 players: vec![],
                 loading: false,
                 client,
-                sender: None
+                sender: None,
             },
             Task::none(),
         )
@@ -141,7 +147,8 @@ impl KCOverlay {
                             window::get_latest().and_then(|x| {
                                 window::change_level(x, iced::window::Level::AlwaysOnTop)
                             }),
-                            window::get_latest().and_then(window::enable_mouse_passthrough),
+                            window::get_latest().and_then(|x |window::minimize(x, false)),
+
                         ])
                     } else {
                         Task::none()
@@ -150,15 +157,17 @@ impl KCOverlay {
                 LogReader::Sender(mut sender) => {
                     let client = self.client.clone();
                     self.sender = Some(sender.clone());
-                    Task::future(async move {sender.send(client).await.unwrap()}).discard()
+                    Task::future(async move { sender.send(client).await.unwrap() }).discard()
                 }
             },
-            Message::ChangeLevel(_) => Task::batch(vec![
-                window::get_latest()
-                    .and_then(|x| window::change_level(x, iced::window::Level::AlwaysOnBottom)),
-                window::get_latest().and_then(window::disable_mouse_passthrough),
-            ]),
+            Message::ChangeLevel(_) => {
+                self.players.clear();
 
+                Task::batch(vec![
+                    window::get_latest()
+                    .and_then(|x| window::minimize(x, true)),
+                ])
+            }
             Message::GotEvent(event) => match event {
                 iced::Event::Mouse(event) => match event {
                     iced::mouse::Event::ButtonPressed(button) => {
@@ -195,18 +204,20 @@ impl KCOverlay {
                     .write_all(serde_json::to_string_pretty(&config).unwrap().as_bytes())
                     .unwrap();
 
-                match self.screen{
+                match self.screen {
                     Screen::Welcome => self.screen = Screen::Main,
-                    _ => ()
+                    _ => (),
                 }
 
                 match &self.sender {
-                    Some(sender) => {
-                        Task::perform(update_client(sender.clone(), self.client.clone()), Message::None)
-                    },
+                    Some(sender) => Task::perform(
+                        update_client(sender.clone(), self.client.clone()),
+                        Message::None,
+                    ),
                     None => Task::none(),
                 }
             }
+            Message::Minimize => window::get_latest().and_then(|x| window::minimize(x, true)),
         }
     }
 
@@ -237,13 +248,21 @@ fn read_command() -> impl Stream<Item = LogReader> {
         let client = receiver.select_next_some().await;
         let minecraft_dir = util::get_minecraft_dir();
 
-        let logs_path = match client{
+        let logs_path = match client {
             MineClient::Default => format!("{}/logs/latest.log", minecraft_dir),
             MineClient::Badlion => format!("{}/logs/blclient/minecraft/latest.log", minecraft_dir),
             MineClient::Lunar => util::lunar_get_newer_logs_path(),
             MineClient::LegacyLauncher => util::get_legacy_launcher_dir(),
         };
 
+        if !Path::new(&logs_path).exists() {
+            output
+                .send(LogReader::Log("AAAAAA!".to_string()))
+                .await
+                .unwrap();
+            output.disconnect();
+            return;
+        }
         let file = File::open(&logs_path).unwrap();
 
         let mut reader = BufReader::new(file);
@@ -263,21 +282,23 @@ fn read_command() -> impl Stream<Item = LogReader> {
                 Err(e) => println!("Error at reading logs: {e}"),
             }
 
-            match receiver.try_next(){
+            match receiver.try_next() {
                 Ok(Some(message)) => {
-                    let logs_path = match message{
+                    let logs_path = match message {
                         MineClient::Default => format!("{}/logs/latest.log", minecraft_dir),
-                        MineClient::Badlion => format!("{}/logs/blclient/minecraft/latest.log", minecraft_dir),
+                        MineClient::Badlion => {
+                            format!("{}/logs/blclient/minecraft/latest.log", minecraft_dir)
+                        }
                         MineClient::Lunar => util::lunar_get_newer_logs_path(),
                         MineClient::LegacyLauncher => util::get_legacy_launcher_dir(),
                     };
-            
+
                     let file = File::open(&logs_path).unwrap();
-            
+
                     reader = BufReader::new(file);
                     buffer = String::new();
                     reader.seek(SeekFrom::End(0)).unwrap();
-                },
+                }
                 Ok(None) => (),
                 Err(_) => (),
             }
@@ -285,7 +306,7 @@ fn read_command() -> impl Stream<Item = LogReader> {
     })
 }
 
-async fn update_client(mut sender: Sender<MineClient>, client: MineClient) -> bool{
+async fn update_client(mut sender: Sender<MineClient>, client: MineClient) -> bool {
     sender.send(client).await.unwrap();
     true
 }
@@ -454,12 +475,12 @@ enum MineClient {
     Default,
     Badlion,
     Lunar,
-    LegacyLauncher
+    LegacyLauncher,
 }
 
-impl ToString for MineClient{
+impl ToString for MineClient {
     fn to_string(&self) -> String {
-        match self{
+        match self {
             MineClient::Default => "Vanilla".to_string(),
             MineClient::Badlion => "Badlion".to_string(),
             MineClient::Lunar => "Lunar".to_string(),

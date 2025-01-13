@@ -1,4 +1,9 @@
-use std::{fs::{self, File}, io::Read, path::Path, time::{Duration, SystemTime}};
+use std::{
+    fs::{self, File},
+    io::Read,
+    path::Path,
+    time::{Duration, SystemTime},
+};
 
 use iced::Color;
 use serde_json::Value;
@@ -17,7 +22,10 @@ pub fn get_minecraft_dir() -> String {
 
 pub fn get_legacy_launcher_dir() -> String {
     match std::env::consts::OS {
-        "linux" => format!("{}/.tlauncher/legacy/Minecraft/game/logs/latest.log", std::env::var("HOME").unwrap()),
+        "linux" => format!(
+            "{}/.tlauncher/legacy/Minecraft/game/logs/latest.log",
+            std::env::var("HOME").unwrap()
+        ),
         "windows" => format!(
             "{}/AppData/Roaming/.tlauncher/legacy/Minecraft/game/logs/latest.log",
             std::env::var("USERPROFILE").unwrap().replace('\\', "/")
@@ -40,7 +48,7 @@ pub fn get_json(jpathstring: String) -> Value {
     serde_json::from_str(&fcontent).unwrap()
 }
 
-pub fn lunar_get_newer_logs_path() -> String{
+pub fn lunar_get_newer_logs_path() -> String {
     let lunar_dir = match std::env::consts::OS {
         "linux" => format!("{}/.lunarclient", std::env::var("HOME").unwrap()),
         "windows" => format!(
@@ -56,12 +64,12 @@ pub fn lunar_get_newer_logs_path() -> String{
 
     let mut newer_log_path = String::new();
     let mut shortest_modification_time = SystemTime::UNIX_EPOCH;
-    for log in fs::read_dir(logs_path).unwrap(){
+    for log in fs::read_dir(logs_path).unwrap() {
         let log = log.unwrap();
         let metadata = log.metadata().unwrap();
-        
+
         let modified_time = metadata.modified().unwrap();
-        if modified_time > shortest_modification_time{
+        if modified_time > shortest_modification_time {
             newer_log_path = log.path().to_string_lossy().to_string();
             shortest_modification_time = modified_time;
         }
