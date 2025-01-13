@@ -10,7 +10,7 @@ use iced::{
     daemon::Appearance, event, futures::{
         channel::mpsc::{self, Sender},
         SinkExt, Stream, StreamExt,
-    }, mouse::Button, stream, time, window::{self, Position, Settings}, Color, Element, Point, Size, Subscription, Task
+    }, mouse::Button, stream, time, window::{self, Icon, Position, Settings}, Color, Element, Point, Size, Subscription, Task
 };
 use reqwest::Client;
 use screens::Screen;
@@ -24,6 +24,8 @@ mod style;
 mod util;
 
 fn main() {
+    let icon = include_bytes!("../assets/icon.png");
+
     iced::application(KCOverlay::title, KCOverlay::update, KCOverlay::view)
         .subscription(KCOverlay::subscription)
         .resizable(false)
@@ -35,6 +37,7 @@ fn main() {
             resizable: false,
             decorations: false,
             transparent: true,
+            icon: Some(window::icon::from_file_data(icon, None).unwrap()),
             ..Default::default()
         })
         .style(|_, _| Appearance {

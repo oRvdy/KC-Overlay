@@ -1,5 +1,5 @@
 [package]
-name = "KC-Overlay"
+name = "KC-cOverlay"
 version = "0.1.1"
 edition = "2021"
 authors = ["jafkc2"]
@@ -10,7 +10,10 @@ strip = true
 lto = true
 
 [dependencies]
-iced = {version = "0.13.1", features = ["tokio"]}
+iced = {version = "0.13.1", features = ["tokio", "image"]}
 reqwest = "0.12.12"
 serde_json = "1.0"
 tokio = { version = "1", features = ["full"] }
+
+[target.'cfg(windows)'.build-dependencies]
+winres = "0.1.12"
