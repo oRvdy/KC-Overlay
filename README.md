@@ -6,13 +6,13 @@ Este programa é um simples overlay para visualizar os stats dos jogadores no Mu
 
 # Como usar
 
-Apenas abra o overlay e depois digite o comando " /jogando "  no chat do jogo.
+Apenas abra o overlay e depois digite o comando "/jogando"  no chat do jogo.
 
 # Clients e launchers suportados
 
 Até o momento, os seguintes clients são suportados:
 * Vanilla
-* CMClient
+* CMClient (Com o Launcher do CMClient não funciona, é necessário usar o CMClient com outro launcher, como o launcher oficial ou o tlauncher)
 * Badlion
 * Lunar
 * Legacy Launcher
