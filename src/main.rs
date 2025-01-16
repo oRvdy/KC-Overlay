@@ -150,11 +150,16 @@ impl KCOverlay {
                 }
             },
             Message::ChangeLevel(_) => {
-                self.players.clear();
+                if self.loading{
+                    Task::none()
+                } else{
+                    self.players.clear();
 
-                Task::batch(vec![
-                    window::get_latest().and_then(|x| window::minimize(x, true))
-                ])
+                    Task::batch(vec![
+                        window::get_latest().and_then(|x| window::minimize(x, true))
+                    ])
+                }
+
             }
             Message::GotEvent(event) => match event {
                 iced::Event::Mouse(event) => match event {
