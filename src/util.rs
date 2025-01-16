@@ -9,15 +9,18 @@ use iced::Color;
 use serde_json::Value;
 use tokio::time::sleep;
 
-pub fn get_minecraft_dir() -> String {
+pub fn get_home_dir() -> String {
     match std::env::consts::OS {
-        "linux" => format!("{}/.minecraft", std::env::var("HOME").unwrap()),
+        "linux" => format!("{}", std::env::var("HOME").unwrap()),
         "windows" => format!(
-            "{}/AppData/Roaming/.minecraft",
+            "{}/AppData/Roaming",
             std::env::var("USERPROFILE").unwrap().replace('\\', "/")
         ),
         _ => panic!("System not supported."),
     }
+}
+pub fn get_minecraft_dir() -> String {
+    format!("{}/.minecraft", get_home_dir())
 }
 
 pub fn get_legacy_launcher_dir() -> String {
@@ -52,7 +55,7 @@ pub fn lunar_get_newer_logs_path() -> String {
     let lunar_dir = match std::env::consts::OS {
         "linux" => format!("{}/.lunarclient", std::env::var("HOME").unwrap()),
         "windows" => format!(
-            "{}/AppData/Roaming/.lunarclient",
+            "{}/.lunarclient",
             std::env::var("USERPROFILE").unwrap().replace('\\', "/")
         ),
         _ => panic!("System not supported."),
