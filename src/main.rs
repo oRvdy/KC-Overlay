@@ -7,10 +7,10 @@ use std::{
 };
 
 use iced::{
-    daemon::Appearance, event, futures::{
+    event, futures::{
         channel::mpsc::{self, Sender},
         SinkExt, Stream, StreamExt,
-    }, mouse::Button, stream, time, window::{self, Icon, Position, Settings}, Color, Element, Point, Size, Subscription, Task
+    }, mouse::Button, stream, theme::Style, time, window::{self, Position, Settings}, Color, Element, Point, Size, Subscription, Task
 };
 use reqwest::Client;
 use screens::Screen;
@@ -18,9 +18,9 @@ use serde_json::Value;
 use tokio::time::sleep;
 use util::RGB;
 
+mod appearance;
 mod config;
 mod screens;
-mod style;
 mod util;
 
 fn main() {
@@ -40,8 +40,8 @@ fn main() {
             icon: Some(window::icon::from_file_data(icon, None).unwrap()),
             ..Default::default()
         })
-        .style(|_, _| Appearance {
-            background_color: Color::from_rgba8(0, 0, 0, 0.5),
+        .style(|_, _| Style {
+            background_color: Color::from_rgba8(24, 25, 33, 0.5),
             text_color: Color::WHITE,
         })
         .run_with(KCOverlay::new)
@@ -61,7 +61,6 @@ struct KCOverlay {
 enum Message {
     None(bool),
     ChangeScreen(Screen),
-    Activation(Vec<Player>),
     Log(LogReader),
     ChangeLevel(bool),
     GotEvent(event::Event),
@@ -69,6 +68,7 @@ enum Message {
     ClientSelect(MineClient),
     ClientUpdate,
     Minimize,
+    PlayerSender(PlayerSender)
 }
 
 impl KCOverlay {
@@ -114,14 +114,7 @@ impl KCOverlay {
                 self.screen = screen;
                 Task::none()
             }
-            Message::Activation(mut players) => {
-                players.sort_by(|a, b| b.level.partial_cmp(&a.level).unwrap());
-                players.truncate(16);
-                self.players = players;
-                self.loading = false;
 
-                Task::perform(util::wait(Duration::from_secs(10)), Message::ChangeLevel)
-            }
             Message::Log(log_reader) => match log_reader {
                 LogReader::Log(message) => {
                     if message.contains("[CHAT] Jogadores") {
@@ -140,12 +133,11 @@ impl KCOverlay {
                         self.loading = true;
 
                         Task::batch(vec![
-                            Task::perform(get_players_info(str_players), Message::Activation),
+                            Task::run(get_players(str_players), |player_sender: PlayerSender| Message::PlayerSender(player_sender)),
                             window::get_latest().and_then(|x| {
-                                window::change_level(x, iced::window::Level::AlwaysOnTop)
+                                window::set_level(x, iced::window::Level::AlwaysOnTop)
                             }),
-                            window::get_latest().and_then(|x |window::minimize(x, false)),
-
+                            window::get_latest().and_then(|x| window::minimize(x, false)),
                         ])
                     } else {
                         Task::none()
@@ -161,8 +153,7 @@ impl KCOverlay {
                 self.players.clear();
 
                 Task::batch(vec![
-                    window::get_latest()
-                    .and_then(|x| window::minimize(x, true)),
+                    window::get_latest().and_then(|x| window::minimize(x, true))
                 ])
             }
             Message::GotEvent(event) => match event {
@@ -215,14 +206,29 @@ impl KCOverlay {
                 }
             }
             Message::Minimize => window::get_latest().and_then(|x| window::minimize(x, true)),
-            Message::ClientUpdate => {
-                match &self.sender {
-                    Some(sender) => Task::perform(
-                        update_client(sender.clone(), self.client.clone()),
-                        Message::None,
-                    ),
-                    None => Task::none(),
+            Message::ClientUpdate => match &self.sender {
+                Some(sender) => Task::perform(
+                    update_client(sender.clone(), self.client.clone()),
+                    Message::None,
+                ),
+                None => Task::none(),
+            },
+            Message::PlayerSender(player_sender) => {
+                match player_sender {
+                    PlayerSender::Player(player) => {
+                        println!("AAA");
+                        self.players.push(player);
+                        self.players.sort_by(|a, b| b.level.partial_cmp(&a.level).unwrap());
+                        self.players.truncate(16);
+                        Task::none()
+                    },
+                    PlayerSender::Done => {
+                        println!("aaa");
+                        self.loading = false;
+                        Task::perform(util::wait(Duration::from_secs(10)), Message::ChangeLevel)
+                    },
                 }
+
             },
         }
     }
@@ -236,11 +242,12 @@ impl KCOverlay {
         let command_reader = Subscription::run(read_command).map(Message::Log);
 
         // In case the user opens the game after the overlay
-        let client = self.client.clone();
-        let client_updater = time::every(Duration::from_secs(20)).map(move |_| Message::ClientUpdate);
+        let client_updater =
+            time::every(Duration::from_secs(20)).map(move |_| Message::ClientUpdate);
 
         Subscription::batch(vec![event, command_reader, client_updater])
     }
+
 }
 
 #[derive(Debug, Clone)]
@@ -316,101 +323,117 @@ fn read_command() -> impl Stream<Item = LogReader> {
     })
 }
 
+
+#[derive(Clone, Debug)]
+enum PlayerSender {
+    Player(Player),
+    Done
+}
+fn get_players(str_player_list: Vec<String>) -> impl Stream<Item = PlayerSender>{
+    stream::channel(100, |mut output| async move {
+        //let (sender, mut receiver) = mpsc::channel(100);
+
+        //output.send(PlayerSender::Sender(sender)).await.unwrap();
+        //let str_player_list = receiver.select_next_some().await;
+
+
+        let client = Client::new();
+        const MUSH_API: &str = "https://mush.com.br/api/player/";
+
+
+        for i in str_player_list {
+            let url = format!("{}{}", MUSH_API, i);
+            let request = match client.get(url).send().await {
+                Ok(response) => match response.text().await {
+                    Ok(ok) => ok,
+                    Err(e) => {
+                        println!("Failed to get text of {i}'s API response: {e}\n Skipping.");
+                        continue;
+                    }
+                },
+                Err(e) => {
+                    println!("Failed to get {i} response: {e}\n Skipping.");
+                    continue;
+                }
+            };
+    
+            println!("Getting {i} stats...");
+    
+            let json: Value = match serde_json::from_str(&request) {
+                Ok(ok) => ok,
+                Err(e) => {
+                    println!("{i}: {e}");
+                    continue;
+                }
+            };
+    
+            if !json["success"].as_bool().unwrap() {
+                output.send(PlayerSender::Player(Player::new_nicked(i.to_string()))).await.unwrap();
+                continue;
+            }
+            let response = json["response"].clone();
+    
+            if response["last_login"].as_i64().unwrap() - response["first_login"].as_i64().unwrap()
+                < 10800000
+            {
+                output.send(PlayerSender::Player(Player::new_possible_cheater(i.to_string()))).await.unwrap();
+                continue;
+            }
+    
+            let username_color = response["rank_tag"]["color"].as_str().unwrap();
+            let (clan, clan_color) = if response["clan"].is_object() {
+                (
+                    Some(response["clan"]["tag"].as_str().unwrap().to_string()),
+                    response["clan"]["tag_color"].as_str().unwrap(),
+                )
+            } else {
+                (None, "#ffffff")
+            };
+    
+            let bedwars_stats = response["stats"]["bedwars"].clone();
+            if bedwars_stats.is_object() {
+                let level = bedwars_stats["level"].as_i64().unwrap_or(0);
+                let level_symbol = bedwars_stats["level_badge"]["symbol"]
+                    .as_str()
+                    .unwrap()
+                    .to_string();
+                let level_color = bedwars_stats["level_badge"]["hex_color"]
+                    .as_str()
+                    .unwrap()
+                    .to_string();
+    
+                let winstreak = bedwars_stats["winstreak"].as_i64().unwrap_or(0);
+    
+                let winrate = bedwars_stats["wins"].as_i64().unwrap_or(0) as f32
+                    / bedwars_stats["losses"].as_i64().unwrap_or(0) as f32;
+                let final_kill_final_death_ratio = bedwars_stats["final_kills"].as_i64().unwrap_or(0)
+                    as f32
+                    / bedwars_stats["final_deaths"].as_i64().unwrap_or(0) as f32;
+    
+                output.send(PlayerSender::Player(Player::new(
+                    i,
+                    RGB::from_hex(username_color),
+                    level as i32,
+                    level_symbol,
+                    winstreak as i32,
+                    clan,
+                    RGB::from_hex(clan_color),
+                    winrate,
+                    final_kill_final_death_ratio,
+                    RGB::from_hex(&level_color),
+                ))).await.unwrap();
+            }
+            sleep(Duration::from_millis(60)).await;
+        }
+        output.send(PlayerSender::Done).await.unwrap();
+    })
+}
+
 async fn update_client(mut sender: Sender<MineClient>, client: MineClient) -> bool {
     sender.send(client).await.unwrap();
     true
 }
 
-async fn get_players_info(str_players: Vec<String>) -> Vec<Player> {
-    let mut players = vec![];
-    let client = Client::new();
-    const MUSH_API: &str = "https://mush.com.br/api/player/";
-    for i in str_players {
-        let url = format!("{}{}", MUSH_API, i);
-        let request = match client.get(url).send().await{
-            Ok(response) => match response.text().await{
-                Ok(ok) => ok,
-                Err(e) =>  {
-                    println!("Failed to get text of {i}'s API response: {e}\n Skipping.");
-                    continue;
-                },
-            },
-            Err(e) => {
-                println!("Failed to get {i} response: {e}\n Skipping.");
-                continue;
-            },
-        };
-
-        println!("Getting {i} stats...");
-
-        let json: Value = match serde_json::from_str(&request) {
-            Ok(ok) => ok,
-            Err(e) => {
-                println!("{i}: {e}");
-                continue;
-            }
-        };
-
-        if !json["success"].as_bool().unwrap() {
-            players.push(Player::new_nicked(i.to_string()));
-            continue;
-        }
-        let response = json["response"].clone();
-
-        if response["last_login"].as_i64().unwrap() - response["first_login"].as_i64().unwrap()
-            < 10800000
-        {
-            players.push(Player::new_possible_cheater(i.to_string()));
-            continue;
-        }
-
-        let username_color = response["rank_tag"]["color"].as_str().unwrap();
-        let (clan, clan_color) = if response["clan"].is_object() {
-            (
-                Some(response["clan"]["tag"].as_str().unwrap().to_string()),
-                response["clan"]["tag_color"].as_str().unwrap(),
-            )
-        } else {
-            (None, "#ffffff")
-        };
-
-        let bedwars_stats = response["stats"]["bedwars"].clone();
-        if bedwars_stats.is_object() {
-            let level = bedwars_stats["level"].as_i64().unwrap_or(0);
-            let level_symbol = bedwars_stats["level_badge"]["symbol"]
-                .as_str()
-                .unwrap()
-                .to_string();
-            let level_color = bedwars_stats["level_badge"]["hex_color"]
-                .as_str()
-                .unwrap()
-                .to_string();
-
-            let winstreak = bedwars_stats["winstreak"].as_i64().unwrap_or(0);
-
-            let winrate = bedwars_stats["wins"].as_i64().unwrap_or(0) as f32
-                / bedwars_stats["losses"].as_i64().unwrap_or(0) as f32;
-            let final_kill_final_death_ratio = bedwars_stats["final_kills"].as_i64().unwrap_or(0)
-                as f32
-                / bedwars_stats["final_deaths"].as_i64().unwrap_or(0) as f32;
-
-            players.push(Player::new(
-                i,
-                RGB::from_hex(username_color),
-                level as i32,
-                level_symbol,
-                winstreak as i32,
-                clan,
-                RGB::from_hex(clan_color),
-                winrate,
-                final_kill_final_death_ratio,
-                RGB::from_hex(&level_color),
-            ));
-        }
-        sleep(Duration::from_millis(60)).await;
-    }
-    players
-}
 
 #[derive(Debug, Clone)]
 struct Player {

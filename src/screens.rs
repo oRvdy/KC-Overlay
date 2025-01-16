@@ -1,7 +1,5 @@
 use iced::{
-    theme,
-    widget::{button, column, container, pick_list, row, text, Column},
-    Color, Renderer,
+    border::Radius, theme, widget::{button::{Catalog, Style}, column, container, pick_list, row, text, Column}, Background, Border, Color, Element, Renderer, Shadow, Theme
 };
 
 use crate::{Message, MineClient};
@@ -84,7 +82,7 @@ pub fn get_screen(
             let close = button("Sair").on_press(Message::Close);
             let minimize = button("Minimizar").on_press(Message::Minimize);
 
-            let bottom_row = row![settings, close, minimize].spacing(20);
+            let bottom_row = row![settings, minimize, close].spacing(20);
 
             column![bar, container, bottom_row].padding(10)
         }
@@ -123,4 +121,17 @@ pub fn get_screen(
             .padding(10)
         }
     }
+}
+
+fn button<'a>(content: &str) -> iced::widget::Button<'_, Message, Theme, Renderer>{
+    iced::widget::button(content).style(move |_ : &Theme, _| Style{
+        background: Some(Background::Color(Color::from_rgb8(30, 102, 245))),
+        text_color: Color::from_rgb8(255, 255, 255),
+        border: Border{
+            color: Color::from_rgb8(30, 102, 245),
+            width: 0.,
+            radius: Radius::new(10),
+        },
+        shadow: Shadow::default(),
+    })
 }
