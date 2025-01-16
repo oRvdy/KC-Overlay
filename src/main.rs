@@ -32,7 +32,7 @@ fn main() {
         .decorations(false)
         .transparent(true)
         .window(Settings {
-            size: Size::new(640., 420.),
+            size: Size::new(640., 440.),
             position: Position::Specific(Point::new(0., 50.)),
             resizable: false,
             decorations: false,
@@ -216,14 +216,12 @@ impl KCOverlay {
             Message::PlayerSender(player_sender) => {
                 match player_sender {
                     PlayerSender::Player(player) => {
-                        println!("AAA");
                         self.players.push(player);
                         self.players.sort_by(|a, b| b.level.partial_cmp(&a.level).unwrap());
                         self.players.truncate(16);
                         Task::none()
                     },
                     PlayerSender::Done => {
-                        println!("aaa");
                         self.loading = false;
                         Task::perform(util::wait(Duration::from_secs(10)), Message::ChangeLevel)
                     },
@@ -331,12 +329,6 @@ enum PlayerSender {
 }
 fn get_players(str_player_list: Vec<String>) -> impl Stream<Item = PlayerSender>{
     stream::channel(100, |mut output| async move {
-        //let (sender, mut receiver) = mpsc::channel(100);
-
-        //output.send(PlayerSender::Sender(sender)).await.unwrap();
-        //let str_player_list = receiver.select_next_some().await;
-
-
         let client = Client::new();
         const MUSH_API: &str = "https://mush.com.br/api/player/";
 

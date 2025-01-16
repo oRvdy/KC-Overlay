@@ -1,5 +1,11 @@
 use iced::{
-    border::Radius, theme, widget::{button::{Catalog, Style}, column, container, pick_list, row, text, Column}, Background, Border, Color, Element, Renderer, Shadow, Theme
+    border::Radius,
+    theme,
+    widget::{
+        button::{Catalog, Style},
+        column, container, pick_list, row, text, Column,
+    },
+    Background, Border, Color, Element, Renderer, Shadow, Theme,
 };
 
 use crate::{Message, MineClient};
@@ -19,13 +25,11 @@ pub fn get_screen(
     match screen {
         Screen::Main => {
             let screen_title_text = if app.players.is_empty() {
-                if app.loading {
-                    String::from("Carregando jogadores...")
-                } else {
-                    String::from(
-                        "Digite o comando /jogando no chat do mush para ver os stats dos jogadores",
-                    )
-                }
+                String::from(
+                    "Digite o comando /jogando no chat do mush para ver os stats dos jogadores",
+                )
+            } else if app.loading {
+                String::from("Carregando jogadores...")
             } else {
                 format!("Top {} jogadores da sala", app.players.len())
             };
@@ -61,7 +65,7 @@ pub fn get_screen(
                         username_row.push(text("</nick]>").color(Color::from_rgb8(0, 0, 128)))
                 } else if player.is_possible_cheater {
                     username_row = username_row
-                        .push(text("<possível CHEATER>").color(Color::from_rgb8(255, 0, 0)))
+                        .push(text("<possível CHEATER>").color(Color::from_rgb8(255, 0, 0)).size(12))
                 }
                 username_column = username_column.push(username_row);
                 winstreak_column = winstreak_column.push(winstreak_widget);
@@ -75,7 +79,7 @@ pub fn get_screen(
                 fkfdr_column
             ]
             .spacing(5);
-            let container = container(column_row).height(335);
+            let container = container(column_row).height(355);
 
             let settings =
                 button("Configurações").on_press(Message::ChangeScreen(Screen::Settings));
@@ -123,11 +127,11 @@ pub fn get_screen(
     }
 }
 
-fn button<'a>(content: &str) -> iced::widget::Button<'_, Message, Theme, Renderer>{
-    iced::widget::button(content).style(move |_ : &Theme, _| Style{
+fn button<'a>(content: &str) -> iced::widget::Button<'_, Message, Theme, Renderer> {
+    iced::widget::button(content).style(move |_: &Theme, _| Style {
         background: Some(Background::Color(Color::from_rgb8(30, 102, 245))),
         text_color: Color::from_rgb8(255, 255, 255),
-        border: Border{
+        border: Border {
             color: Color::from_rgb8(30, 102, 245),
             width: 0.,
             radius: Radius::new(10),
