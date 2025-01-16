@@ -420,7 +420,7 @@ fn get_players(str_player_list: Vec<String>) -> impl Stream<Item = PlayerSender>
                     RGB::from_hex(&level_color),
                 ))).await.unwrap();
             }
-            sleep(Duration::from_millis(60)).await;
+            sleep(Duration::from_millis(40)).await;
         }
         output.send(PlayerSender::Done).await.unwrap();
     })
@@ -481,7 +481,7 @@ impl Player {
         Player {
             username,
             username_color: RGB::new(0, 255, 255),
-            level: 0,
+            level: 999,
             level_symbol: "?".to_string(),
             winstreak: 0,
             clan: None,
@@ -498,7 +498,7 @@ impl Player {
         Player {
             username,
             username_color: RGB::new(255, 0, 0),
-            level: 0,
+            level: 999,
             level_symbol: "?".to_string(),
             winstreak: 0,
             clan: None,
