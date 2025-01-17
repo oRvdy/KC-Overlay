@@ -371,7 +371,7 @@ fn get_players(str_player_list: Vec<String>) -> impl Stream<Item = PlayerSender>
             let response = json["response"].clone();
     
             if response["last_login"].as_i64().unwrap() - response["first_login"].as_i64().unwrap()
-                < 10800000
+                < 7200000
             {
                 output.send(PlayerSender::Player(Player::new_possible_cheater(i.to_string()))).await.unwrap();
                 continue;

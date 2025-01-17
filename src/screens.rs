@@ -41,7 +41,7 @@ pub fn get_screen(
             let mut username_column = Column::new().width(280);
             let mut winstreak_column = Column::new();
             let mut winrate_column = Column::new();
-            let mut fkfdr_column = Column::new();
+            let mut fkdr_column = Column::new();
 
             let players = app.players.clone();
             for player in players {
@@ -55,9 +55,9 @@ pub fn get_screen(
                     text(format!("[{}] ", player.level)).color(player.level_color.to_color());
                 let username_widget = text(player.username).color(player.username_color.to_color());
                 let clan_widget = text(clan).color(player.clan_color.to_color());
-                let winstreak_widget = text(format!("{} winstreak", player.winstreak));
+                let winstreak_widget = text(format!("{} ws", player.winstreak));
                 let winrate_widget = text(format!("{:.2} winrate", player.winrate));
-                let fkfdr = text(format!("{:.2} fkfdr", player.final_kill_final_death_ratio));
+                let fkdr = text(format!("{:.2} fkdr", player.final_kill_final_death_ratio));
 
                 let mut username_row = row![level_widget, username_widget, clan_widget];
                 if player.is_nicked {
@@ -70,13 +70,13 @@ pub fn get_screen(
                 username_column = username_column.push(username_row);
                 winstreak_column = winstreak_column.push(winstreak_widget);
                 winrate_column = winrate_column.push(winrate_widget);
-                fkfdr_column = fkfdr_column.push(fkfdr);
+                fkdr_column = fkdr_column.push(fkdr);
             }
             let column_row = row![
                 username_column,
                 winstreak_column,
                 winrate_column,
-                fkfdr_column
+                fkdr_column
             ]
             .spacing(5);
             let container = container(column_row).height(355);
