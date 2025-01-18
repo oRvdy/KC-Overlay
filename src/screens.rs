@@ -2,10 +2,10 @@ use iced::{
     border::Radius,
     theme,
     widget::{
-        button::{Catalog, Style},
+        button::Style,
         column, container, pick_list, row, text, Column,
     },
-    Background, Border, Color, Element, Renderer, Shadow, Theme,
+    Background, Border, Color, Renderer, Shadow, Theme,
 };
 
 use crate::{Message, MineClient};
