@@ -18,7 +18,6 @@ use serde_json::Value;
 use tokio::time::sleep;
 use util::RGB;
 
-mod appearance;
 mod config;
 mod screens;
 mod util;
