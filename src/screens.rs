@@ -1,10 +1,10 @@
+use std::borrow::Borrow;
+
 use iced::{
     border::Radius,
     theme,
-    widget::{
-        button::Style,
-        column, container, pick_list, row, text, Column,
-    },
+    wgpu::core,
+    widget::{column, container, row, text, Column, PickList},
     Background, Border, Color, Renderer, Shadow, Theme,
 };
 
@@ -64,8 +64,11 @@ pub fn get_screen(
                     username_row =
                         username_row.push(text("</nick]>").color(Color::from_rgb8(0, 0, 128)))
                 } else if player.is_possible_cheater {
-                    username_row = username_row
-                        .push(text("<possível CHEATER>").color(Color::from_rgb8(255, 0, 0)).size(12))
+                    username_row = username_row.push(
+                        text("<possível CHEATER>")
+                            .color(Color::from_rgb8(255, 0, 0))
+                            .size(12),
+                    )
                 }
                 username_column = username_column.push(username_row);
                 winstreak_column = winstreak_column.push(winstreak_widget);
@@ -128,7 +131,7 @@ pub fn get_screen(
 }
 
 fn button<'a>(content: &str) -> iced::widget::Button<'_, Message, Theme, Renderer> {
-    iced::widget::button(content).style(move |_: &Theme, _| Style {
+    iced::widget::button(content).style(move |_: &Theme, _| iced::widget::button::Style {
         background: Some(Background::Color(Color::from_rgb8(30, 102, 245))),
         text_color: Color::from_rgb8(255, 255, 255),
         border: Border {
@@ -138,4 +141,40 @@ fn button<'a>(content: &str) -> iced::widget::Button<'_, Message, Theme, Rendere
         },
         shadow: Shadow::default(),
     })
+}
+
+pub fn pick_list<'a, T, L, V, Message>(
+    options: L,
+    selected: Option<V>,
+    on_selected: impl Fn(T) -> Message + 'a,
+) -> PickList<'a, T, L, V, Message, Theme, Renderer>
+where
+    T: ToString + PartialEq + Clone + 'a,
+    L: Borrow<[T]> + 'a,
+    V: Borrow<T> + 'a,
+    Message: Clone,
+{
+    iced::widget::pick_list(options, selected, on_selected)
+        .style(move |_: &Theme, _| iced::widget::pick_list::Style {
+            text_color: Color::from_rgb8(255, 255, 255),
+            placeholder_color: Color::from_rgb8(255, 255, 255),
+            handle_color: Color::from_rgb8(30, 102, 245),
+            background: Background::Color(Color::from_rgb8(54, 58, 79)),
+            border: Border {
+                color: Color::from_rgb8(54, 58, 79),
+                width: 0.,
+                radius: Radius::new(10),
+            },
+        })
+        .menu_style(|_| iced::overlay::menu::Style {
+            background: Background::Color(Color::from_rgb8(54, 58, 79)),
+            border: Border {
+                color: Color::from_rgb8(54, 58, 79),
+                width: 0.,
+                radius: Radius::new(10),
+            },
+            text_color: Color::from_rgb8(255, 255, 255),
+            selected_text_color: Color::from_rgb8(255, 255, 255),
+            selected_background: Background::Color(Color::from_rgb8(73, 77, 100)),
+        })
 }

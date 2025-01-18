@@ -7,10 +7,17 @@ use std::{
 };
 
 use iced::{
-    event, futures::{
+    event,
+    futures::{
         channel::mpsc::{self, Sender},
         SinkExt, Stream, StreamExt,
-    }, mouse::Button, stream, theme::Style, time, window::{self, Position, Settings}, Color, Element, Point, Size, Subscription, Task
+    },
+    mouse::Button,
+    stream,
+    theme::Style,
+    time,
+    window::{self, Position, Settings},
+    Color, Element, Point, Size, Subscription, Task,
 };
 use reqwest::Client;
 use screens::Screen;
@@ -67,7 +74,7 @@ enum Message {
     ClientSelect(MineClient),
     ClientUpdate,
     Minimize,
-    PlayerSender(PlayerSender)
+    PlayerSender(PlayerSender),
 }
 
 impl KCOverlay {
@@ -132,7 +139,9 @@ impl KCOverlay {
                         self.loading = true;
 
                         Task::batch(vec![
-                            Task::run(get_players(str_players), |player_sender: PlayerSender| Message::PlayerSender(player_sender)),
+                            Task::run(get_players(str_players), |player_sender: PlayerSender| {
+                                Message::PlayerSender(player_sender)
+                            }),
                             window::get_latest().and_then(|x| {
                                 window::set_level(x, iced::window::Level::AlwaysOnTop)
                             }),
@@ -149,16 +158,15 @@ impl KCOverlay {
                 }
             },
             Message::ChangeLevel(_) => {
-                if self.loading{
+                if self.loading {
                     Task::none()
-                } else{
+                } else {
                     self.players.clear();
 
                     Task::batch(vec![
                         window::get_latest().and_then(|x| window::minimize(x, true))
                     ])
                 }
-
             }
             Message::GotEvent(event) => match event {
                 iced::Event::Mouse(event) => match event {
@@ -217,20 +225,18 @@ impl KCOverlay {
                 ),
                 None => Task::none(),
             },
-            Message::PlayerSender(player_sender) => {
-                match player_sender {
-                    PlayerSender::Player(player) => {
-                        self.players.push(player);
-                        self.players.sort_by(|a, b| b.level.partial_cmp(&a.level).unwrap());
-                        self.players.truncate(16);
-                        Task::none()
-                    },
-                    PlayerSender::Done => {
-                        self.loading = false;
-                        Task::perform(util::wait(Duration::from_secs(10)), Message::ChangeLevel)
-                    },
+            Message::PlayerSender(player_sender) => match player_sender {
+                PlayerSender::Player(player) => {
+                    self.players.push(player);
+                    self.players
+                        .sort_by(|a, b| b.level.partial_cmp(&a.level).unwrap());
+                    self.players.truncate(16);
+                    Task::none()
                 }
-
+                PlayerSender::Done => {
+                    self.loading = false;
+                    Task::perform(util::wait(Duration::from_secs(10)), Message::ChangeLevel)
+                }
             },
         }
     }
@@ -249,7 +255,6 @@ impl KCOverlay {
 
         Subscription::batch(vec![event, command_reader, client_updater])
     }
-
 }
 
 #[derive(Debug, Clone)]
@@ -325,17 +330,15 @@ fn read_command() -> impl Stream<Item = LogReader> {
     })
 }
 
-
 #[derive(Clone, Debug)]
 enum PlayerSender {
     Player(Player),
-    Done
+    Done,
 }
-fn get_players(str_player_list: Vec<String>) -> impl Stream<Item = PlayerSender>{
+fn get_players(str_player_list: Vec<String>) -> impl Stream<Item = PlayerSender> {
     stream::channel(100, |mut output| async move {
         let client = Client::new();
         const MUSH_API: &str = "https://mush.com.br/api/player/";
-
 
         for i in str_player_list {
             let url = format!("{}{}", MUSH_API, i);
@@ -352,9 +355,9 @@ fn get_players(str_player_list: Vec<String>) -> impl Stream<Item = PlayerSender>
                     continue;
                 }
             };
-    
+
             println!("Getting {i} stats...");
-    
+
             let json: Value = match serde_json::from_str(&request) {
                 Ok(ok) => ok,
                 Err(e) => {
@@ -362,20 +365,28 @@ fn get_players(str_player_list: Vec<String>) -> impl Stream<Item = PlayerSender>
                     continue;
                 }
             };
-    
+
             if !json["success"].as_bool().unwrap() {
-                output.send(PlayerSender::Player(Player::new_nicked(i.to_string()))).await.unwrap();
+                output
+                    .send(PlayerSender::Player(Player::new_nicked(i.to_string())))
+                    .await
+                    .unwrap();
                 continue;
             }
             let response = json["response"].clone();
-    
+
             if response["last_login"].as_i64().unwrap() - response["first_login"].as_i64().unwrap()
                 < 7200000
             {
-                output.send(PlayerSender::Player(Player::new_possible_cheater(i.to_string()))).await.unwrap();
+                output
+                    .send(PlayerSender::Player(Player::new_possible_cheater(
+                        i.to_string(),
+                    )))
+                    .await
+                    .unwrap();
                 continue;
             }
-    
+
             let username_color = response["rank_tag"]["color"].as_str().unwrap();
             let (clan, clan_color) = if response["clan"].is_object() {
                 (
@@ -385,7 +396,7 @@ fn get_players(str_player_list: Vec<String>) -> impl Stream<Item = PlayerSender>
             } else {
                 (None, "#ffffff")
             };
-    
+
             let bedwars_stats = response["stats"]["bedwars"].clone();
             if bedwars_stats.is_object() {
                 let level = bedwars_stats["level"].as_i64().unwrap_or(0);
@@ -397,27 +408,30 @@ fn get_players(str_player_list: Vec<String>) -> impl Stream<Item = PlayerSender>
                     .as_str()
                     .unwrap()
                     .to_string();
-    
+
                 let winstreak = bedwars_stats["winstreak"].as_i64().unwrap_or(0);
-    
+
                 let winrate = bedwars_stats["wins"].as_i64().unwrap_or(0) as f32
                     / bedwars_stats["losses"].as_i64().unwrap_or(0) as f32;
-                let final_kill_final_death_ratio = bedwars_stats["final_kills"].as_i64().unwrap_or(0)
-                    as f32
-                    / bedwars_stats["final_deaths"].as_i64().unwrap_or(0) as f32;
-    
-                output.send(PlayerSender::Player(Player::new(
-                    i,
-                    RGB::from_hex(username_color),
-                    level as i32,
-                    level_symbol,
-                    winstreak as i32,
-                    clan,
-                    RGB::from_hex(clan_color),
-                    winrate,
-                    final_kill_final_death_ratio,
-                    RGB::from_hex(&level_color),
-                ))).await.unwrap();
+                let final_kill_final_death_ratio =
+                    bedwars_stats["final_kills"].as_i64().unwrap_or(0) as f32
+                        / bedwars_stats["final_deaths"].as_i64().unwrap_or(0) as f32;
+
+                output
+                    .send(PlayerSender::Player(Player::new(
+                        i,
+                        RGB::from_hex(username_color),
+                        level as i32,
+                        level_symbol,
+                        winstreak as i32,
+                        clan,
+                        RGB::from_hex(clan_color),
+                        winrate,
+                        final_kill_final_death_ratio,
+                        RGB::from_hex(&level_color),
+                    )))
+                    .await
+                    .unwrap();
             }
             sleep(Duration::from_millis(40)).await;
         }
@@ -429,7 +443,6 @@ async fn update_client(mut sender: Sender<MineClient>, client: MineClient) -> bo
     sender.send(client).await.unwrap();
     true
 }
-
 
 #[derive(Debug, Clone)]
 struct Player {
