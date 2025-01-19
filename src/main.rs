@@ -47,7 +47,7 @@ fn main() {
             ..Default::default()
         })
         .style(|_, _| Style {
-            background_color: Color::from_rgba8(24, 25, 33, 0.5),
+            background_color: Color::from_rgba8(24, 25, 33, 0.75),
             text_color: Color::WHITE,
         })
         .run_with(KCOverlay::new)
