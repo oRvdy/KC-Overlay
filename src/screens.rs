@@ -16,6 +16,7 @@ pub enum Screen {
     Main,
     Settings,
     Welcome,
+    Info
 }
 
 pub fn get_screen(
@@ -88,8 +89,9 @@ pub fn get_screen(
                 button("Configurações").on_press(Message::ChangeScreen(Screen::Settings));
             let close = button("Sair").on_press(Message::Close);
             let minimize = button("Minimizar").on_press(Message::Minimize);
+            let info = button("Sobre").on_press(Message::ChangeScreen(Screen::Info));
 
-            let bottom_row = row![settings, minimize, close].spacing(20);
+            let bottom_row = row![settings, info, minimize, close].spacing(20);
 
             column![bar, container, bottom_row].padding(10)
         }
@@ -127,6 +129,23 @@ pub fn get_screen(
             .spacing(10)
             .padding(10)
         }
+        Screen::Info => {
+            let thanks_text = text("Muito obrigado por usar o KC Overlay! Considere virar membro do Discord para saber das novidades");
+            let discord_button = button("Entrar no discord");
+
+            let creditos = text(format!("KC Overlay {} - Criado por Jafkc2",  env!("CARGO_PKG_VERSION")));
+            let github = button("Acessar Github");
+
+            let go_back = button("Voltar").on_press(Message::ChangeScreen(Screen::Main));
+
+            let discord_column = column![thanks_text, discord_button].spacing(10).height(125);
+            let credits_column = column![creditos, github].spacing(10);
+
+            let main_column = column![discord_column, credits_column].height(365);
+
+
+            column![main_column, go_back].spacing(10).padding(10)
+        },
     }
 }
 
