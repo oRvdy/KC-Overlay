@@ -433,7 +433,7 @@ fn get_players(str_player_list: Vec<String>) -> impl Stream<Item = PlayerSender>
                     .await
                     .unwrap();
             }
-            sleep(Duration::from_millis(40)).await;
+            sleep(Duration::from_millis(50)).await;
         }
         output.send(PlayerSender::Done).await.unwrap();
     })

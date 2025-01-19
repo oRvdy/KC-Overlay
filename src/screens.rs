@@ -8,7 +8,7 @@ use iced::{
     Background, Border, Color, Renderer, Shadow, Theme,
 };
 
-use crate::{Message, MineClient};
+use crate::{main, Message, MineClient};
 
 #[derive(Clone, Copy, Default, Debug)]
 pub enum Screen {
@@ -23,6 +23,9 @@ pub fn get_screen(
     screen: Screen,
     app: &super::KCOverlay,
 ) -> Column<'static, super::Message, theme::Theme, Renderer> {
+
+    const COLUMN_HEIGHT: u16 = 375;
+
     match screen {
         Screen::Main => {
             let screen_title_text = if app.players.is_empty() {
@@ -39,7 +42,7 @@ pub fn get_screen(
 
             let bar = row![screen_title_widget];
 
-            let mut username_column = Column::new().width(280);
+            let mut username_column = Column::new().width(300);
             let mut winstreak_column = Column::new();
             let mut winrate_column = Column::new();
             let mut fkdr_column = Column::new();
@@ -63,7 +66,7 @@ pub fn get_screen(
                 let mut username_row = row![level_widget, username_widget, clan_widget];
                 if player.is_nicked {
                     username_row =
-                        username_row.push(text("</nick]>").color(Color::from_rgb8(0, 0, 128)))
+                        username_row.push(text("</nick>").color(Color::from_rgb8(255, 255, 0)))
                 } else if player.is_possible_cheater {
                     username_row = username_row.push(
                         text("<possível CHEATER>")
@@ -82,8 +85,8 @@ pub fn get_screen(
                 winrate_column,
                 fkdr_column
             ]
-            .spacing(5);
-            let container = container(column_row).height(355);
+            .spacing(10);
+            let container = container(column_row);
 
             let settings =
                 button("Configurações").on_press(Message::ChangeScreen(Screen::Settings));
@@ -93,7 +96,9 @@ pub fn get_screen(
 
             let bottom_row = row![settings, info, minimize, close].spacing(20);
 
-            column![bar, container, bottom_row].padding(10)
+            let main_column = column![bar, container].spacing(10).height(COLUMN_HEIGHT);
+
+            column![main_column, bottom_row].padding(10).spacing(10)
         }
         Screen::Settings => {
             use super::MineClient;
@@ -102,7 +107,9 @@ pub fn get_screen(
             let client_row = row![text("Client:"), client_select].spacing(10);
             let go_back = button("Voltar").on_press(Message::ChangeScreen(Screen::Main));
 
-            column![client_row, go_back].padding(10).spacing(10)
+            let main_column = column![client_row].spacing(10).height(COLUMN_HEIGHT);
+
+            column![main_column, go_back].padding(10).spacing(10)
         }
         Screen::Welcome => {
             let welcome_text = text("Muito obrigado por usar a overlay! Selecione o client que você usa para proseguir.");
@@ -141,7 +148,7 @@ pub fn get_screen(
             let discord_column = column![thanks_text, discord_button].spacing(10).height(125);
             let credits_column = column![creditos, github].spacing(10);
 
-            let main_column = column![discord_column, credits_column].height(365);
+            let main_column = column![discord_column, credits_column].height(COLUMN_HEIGHT);
 
 
             column![main_column, go_back].spacing(10).padding(10)
