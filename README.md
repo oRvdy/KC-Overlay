@@ -26,6 +26,6 @@ Simplesmente acesse https://github.com/jafkc2/KC-Overlay/releases/latest e selec
 
 # Comunidade
 
-Possui alguma dúvida ou sugestão? Entre no nosso servidor do Discord: https://discord.gg/XK4G4Bxs
+Possui alguma dúvida ou sugestão? Entre no nosso servidor do Discord: https://discord.gg/SqT7YHSGzJ
 
 ### Obs: este programa ainda está em estágio inicial de desenvolvimento, então será comum encontrar bugs. Por favor relate-os no servidor do Discord ou no Github Issues, caso encontrar algum.

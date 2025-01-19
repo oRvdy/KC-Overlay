@@ -1,9 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 use std::{
-    fs::{File, OpenOptions},
-    io::{BufRead, BufReader, Seek, SeekFrom, Write},
-    path::Path,
-    time::Duration,
+    env, fs::{self, File, OpenOptions}, io::{BufRead, BufReader, Seek, SeekFrom, Write}, path::Path, time::Duration
 };
 
 use iced::{
@@ -28,8 +25,17 @@ use util::RGB;
 mod config;
 mod screens;
 mod util;
+mod update;
 
 fn main() {
+    let old_exec = env::current_exe().unwrap().with_extension("old");
+    if Path::new(&old_exec).exists() {
+        match fs::remove_file(old_exec) {
+            Ok(ok) => ok,
+            Err(e) => println!("Failed to delete old executable: {e}"),
+        }
+    }
+
     let icon = include_bytes!("../assets/icon.png");
 
     iced::application(KCOverlay::title, KCOverlay::update, KCOverlay::view)
@@ -61,6 +67,7 @@ struct KCOverlay {
     loading: bool,
     client: MineClient,
     sender: Option<mpsc::Sender<MineClient>>,
+    update: Update
 }
 
 #[derive(Debug, Clone)]
@@ -75,6 +82,10 @@ enum Message {
     ClientUpdate,
     Minimize,
     PlayerSender(PlayerSender),
+    CheckedUpdates(Result<(String, String), String>),
+    OpenLink(String),
+    Update,
+    UpdateResult(Result<(), String>)
 }
 
 impl KCOverlay {
@@ -103,8 +114,9 @@ impl KCOverlay {
                 loading: false,
                 client,
                 sender: None,
+                update: Update::empty(),
             },
-            Task::none(),
+            Task::batch(vec![Task::perform(update::check_updates(), Message::CheckedUpdates)]),
         )
     }
 
@@ -236,6 +248,52 @@ impl KCOverlay {
                 PlayerSender::Done => {
                     self.loading = false;
                     Task::perform(util::wait(Duration::from_secs(10)), Message::ChangeLevel)
+                }
+            },
+            Message::CheckedUpdates(result) => {
+                match result {
+                    Ok((url, last_version)) => {
+                        self.update = Update{
+                            available: true,
+                            url,
+                            last_version,
+                        }
+                    }
+                    Err(e) => println!("{e}"),
+                }
+                Task::none()
+            }
+            Message::OpenLink(url) => {
+                open::that(url).unwrap();
+                Task::none()
+            },
+            Message::Update => {
+                self.update.available = false;
+                Task::perform(update::install_update(self.update.url.clone()), Message::UpdateResult)
+            },
+            Message::UpdateResult(result) => {
+                match result{
+                    Ok(_) => {
+                        let exec_path = env::current_exe().unwrap();
+
+                        let exec_name = exec_path.clone().file_name().unwrap().to_string_lossy().to_string();
+
+                        // renames current executable to KC-Overlay.old and renames updated executable to KC-Overlay
+                        fs::rename(&exec_path, exec_path.with_extension("old")).unwrap();
+                        fs::rename(exec_path.with_extension("new"), exec_path).unwrap();
+
+                        
+                        let mut new_exe_path = env::current_exe().unwrap();
+                        new_exe_path.pop();
+
+                        new_exe_path = new_exe_path.join(exec_name);
+
+                        match std::process::Command::new(new_exe_path).spawn() {
+                            Ok(_) => std::process::exit(0),
+                            Err(e) => panic!("{}", e),
+                        }
+                    },
+                    Err(e) => {println!("{}", e); Task::none()},
                 }
             },
         }
@@ -541,5 +599,18 @@ impl ToString for MineClient {
             MineClient::Lunar => "Lunar".to_string(),
             MineClient::LegacyLauncher => "Legacy Launcher".to_string(),
         }
+    }
+}
+
+#[derive(Default)]
+struct Update{
+    available : bool,
+    url: String,
+    last_version : String
+}
+
+impl Update{
+    fn empty() -> Self{
+        Self { available: false, url: String::new(), last_version: String::new() }
     }
 }

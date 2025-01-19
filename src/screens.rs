@@ -3,12 +3,11 @@ use std::borrow::Borrow;
 use iced::{
     border::Radius,
     theme,
-    wgpu::core,
     widget::{column, container, row, text, Column, PickList},
     Background, Border, Color, Renderer, Shadow, Theme,
 };
 
-use crate::{main, Message, MineClient};
+use crate::{Message, MineClient};
 
 #[derive(Clone, Copy, Default, Debug)]
 pub enum Screen {
@@ -94,7 +93,11 @@ pub fn get_screen(
             let minimize = button("Minimizar").on_press(Message::Minimize);
             let info = button("Sobre").on_press(Message::ChangeScreen(Screen::Info));
 
-            let bottom_row = row![settings, info, minimize, close].spacing(20);
+            let mut bottom_row = row![settings, info, minimize, close].spacing(20);
+            if app.update.available{
+                let update_button = secondary_button("Atualizar").on_press(Message::Update);
+                bottom_row = bottom_row.push(update_button);
+            }
 
             let main_column = column![bar, container].spacing(10).height(COLUMN_HEIGHT);
 
@@ -138,10 +141,10 @@ pub fn get_screen(
         }
         Screen::Info => {
             let thanks_text = text("Muito obrigado por usar o KC Overlay! Considere virar membro do Discord para saber das novidades");
-            let discord_button = button("Entrar no discord");
+            let discord_button = button("Entrar no discord").on_press(Message::OpenLink(String::from("https://discord.gg/SqT7YHSGzJ")));
 
             let creditos = text(format!("KC Overlay {} - Criado por Jafkc2",  env!("CARGO_PKG_VERSION")));
-            let github = button("Acessar Github");
+            let github = button("Acessar Github").on_press(Message::OpenLink(String::from("https://github.com/jafkc2/KC-Overlay")));
 
             let go_back = button("Voltar").on_press(Message::ChangeScreen(Screen::Main));
 
@@ -156,12 +159,25 @@ pub fn get_screen(
     }
 }
 
-fn button<'a>(content: &str) -> iced::widget::Button<'_, Message, Theme, Renderer> {
+fn button<'a>(content: impl Into<iced::Element<'a, Message, Theme, Renderer>>) -> iced::widget::Button<'a, Message, Theme, Renderer> {
     iced::widget::button(content).style(move |_: &Theme, _| iced::widget::button::Style {
         background: Some(Background::Color(Color::from_rgb8(30, 102, 245))),
         text_color: Color::from_rgb8(255, 255, 255),
         border: Border {
             color: Color::from_rgb8(30, 102, 245),
+            width: 0.,
+            radius: Radius::new(10),
+        },
+        shadow: Shadow::default(),
+    })
+}
+
+fn secondary_button<'a>(content: impl Into<iced::Element<'a, Message, Theme, Renderer>>) -> iced::widget::Button<'a, Message, Theme, Renderer> {
+    iced::widget::button(content).style(move |_: &Theme, _| iced::widget::button::Style {
+        background: Some(Background::Color(Color::from_rgb8(64, 160, 43))),
+        text_color: Color::from_rgb8(255, 255, 255),
+        border: Border {
+            color: Color::from_rgb8(64, 160, 43),
             width: 0.,
             radius: Radius::new(10),
         },
