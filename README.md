@@ -14,12 +14,15 @@ Possui alguma dúvida, sugestão, ou simplesmente quer saber das novidades? Entr
 
 # Clients e launchers suportados
 
-Até o momento, os seguintes clients são suportados:
-* Vanilla
+Até o momento, os seguintes clients e launchers são suportados:
+* Launcher da Mojang
+* Tlauncher
 * CMClient (Com o Launcher do CMClient não funciona, é necessário usar o CMClient com outro launcher, como o launcher oficial ou o tlauncher)
 * Badlion
 * Lunar
 * Legacy Launcher
+
+Caso queira que seja adicionado suporte para outro launcher ou client, solicite no Discord.
 
 # Como instalar
 
