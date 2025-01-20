@@ -105,7 +105,7 @@ pub fn get_screen(
         }
         Screen::Settings => {
             use super::MineClient;
-            let clients = vec![MineClient::Default, MineClient::Badlion, MineClient::Lunar];
+            let clients = vec![MineClient::Default, MineClient::Badlion, MineClient::Lunar, MineClient::LegacyLauncher];
             let client_select = pick_list(clients, Some(app.client.clone()), Message::ClientSelect);
             let client_row = row![text("Client:"), client_select].spacing(10);
             let go_back = button("Voltar").on_press(Message::ChangeScreen(Screen::Main));
@@ -118,8 +118,8 @@ pub fn get_screen(
             let welcome_text = text("Muito obrigado por usar a overlay! Selecione o client que você usa para proseguir.");
 
             let default_client =
-                button("Vanilla / outro").on_press(Message::ClientSelect(MineClient::Default));
-            let default_client_text = text("Para Vanilla e CMclient.");
+                button("Geral / outro").on_press(Message::ClientSelect(MineClient::Default));
+            let default_client_text = text("Vanilla, CMClient, Forge, etc");
             let dafault_client_row = row![default_client, default_client_text].spacing(10);
 
             let badlion = button("Badlion").on_press(Message::ClientSelect(MineClient::Badlion));

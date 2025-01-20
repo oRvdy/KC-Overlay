@@ -375,7 +375,13 @@ fn read_command() -> impl Stream<Item = LogReader> {
                         MineClient::LegacyLauncher => util::get_legacy_launcher_dir(),
                     };
 
-                    let file = File::open(&logs_path).unwrap();
+                    let file = match File::open(&logs_path){
+                        Ok(ok) => ok,
+                        Err(e) => {
+                            println!("{e}");
+                            continue;
+                        },
+                    };
 
                     reader = BufReader::new(file);
                     buffer = String::new();
@@ -594,7 +600,7 @@ enum MineClient {
 impl ToString for MineClient {
     fn to_string(&self) -> String {
         match self {
-            MineClient::Default => "Vanilla".to_string(),
+            MineClient::Default => "Geral".to_string(),
             MineClient::Badlion => "Badlion".to_string(),
             MineClient::Lunar => "Lunar".to_string(),
             MineClient::LegacyLauncher => "Legacy Launcher".to_string(),
