@@ -1,13 +1,10 @@
-use std::borrow::Borrow;
-
 use iced::{
-    border::Radius,
     theme,
-    widget::{column, container, row, text, Column, PickList},
-    Background, Border, Color, Renderer, Shadow, Theme,
+    widget::{column, container, row, text, Column},
+    Color, Renderer
 };
 
-use crate::{Message, MineClient};
+use crate::{themed_widgets::{button, pick_list, secondary_button, text_input}, Message, MineClient};
 
 #[derive(Clone, Copy, Default, Debug)]
 pub enum Screen {
@@ -15,14 +12,13 @@ pub enum Screen {
     Main,
     Settings,
     Welcome,
-    Info
+    Info,
 }
 
 pub fn get_screen(
     screen: Screen,
     app: &super::KCOverlay,
 ) -> Column<'static, super::Message, theme::Theme, Renderer> {
-
     const COLUMN_HEIGHT: u16 = 375;
 
     match screen {
@@ -94,7 +90,7 @@ pub fn get_screen(
             let info = button("Sobre").on_press(Message::ChangeScreen(Screen::Info));
 
             let mut bottom_row = row![settings, info, minimize, close].spacing(20);
-            if app.update.available{
+            if app.update.available {
                 let update_button = secondary_button("Atualizar").on_press(Message::Update);
                 bottom_row = bottom_row.push(update_button);
             }
@@ -105,12 +101,37 @@ pub fn get_screen(
         }
         Screen::Settings => {
             use super::MineClient;
-            let clients = vec![MineClient::Default, MineClient::Badlion, MineClient::Lunar, MineClient::LegacyLauncher];
+            let clients = vec![
+                MineClient::Default,
+                MineClient::Badlion,
+                MineClient::Lunar,
+                MineClient::LegacyLauncher,
+                MineClient::Custom(" ".to_string()),
+            ];
             let client_select = pick_list(clients, Some(app.client.clone()), Message::ClientSelect);
             let client_row = row![text("Client:"), client_select].spacing(10);
+
             let go_back = button("Voltar").on_press(Message::ChangeScreen(Screen::Main));
 
-            let main_column = column![client_row].spacing(10).height(COLUMN_HEIGHT);
+            let mut main_column = column![client_row].spacing(10).height(COLUMN_HEIGHT);
+
+            match &app.client {
+                MineClient::Custom(path) => {
+                    let custom_client_text = text("Último log do client (ex: logs/latest.log):");
+                    let custom_client_path =
+                        text_input("Insira o último arquivo de log", &path)
+                            .on_input(Message::CustomClientPathModified);
+                    let custom_client_search = button("Procurar").on_press(Message::SearchExplorer);
+
+                    let custom_client_row =
+                        row![custom_client_path, custom_client_search].spacing(10);
+
+                    main_column = main_column
+                        .push(column![custom_client_text, custom_client_row])
+                        .spacing(10)
+                }
+                _ => (),
+            }
 
             column![main_column, go_back].padding(10).spacing(10)
         }
@@ -141,10 +162,17 @@ pub fn get_screen(
         }
         Screen::Info => {
             let thanks_text = text("Muito obrigado por usar o KC Overlay! Considere virar membro do Discord para saber das novidades");
-            let discord_button = button("Entrar no discord").on_press(Message::OpenLink(String::from("https://discord.gg/SqT7YHSGzJ")));
+            let discord_button = button("Entrar no discord").on_press(Message::OpenLink(
+                String::from("https://discord.gg/SqT7YHSGzJ"),
+            ));
 
-            let creditos = text(format!("KC Overlay {} - Criado por Jafkc2",  env!("CARGO_PKG_VERSION")));
-            let github = button("Acessar Github").on_press(Message::OpenLink(String::from("https://github.com/jafkc2/KC-Overlay")));
+            let creditos = text(format!(
+                "KC Overlay {} - Criado por Jafkc2",
+                env!("CARGO_PKG_VERSION")
+            ));
+            let github = button("Acessar Github").on_press(Message::OpenLink(String::from(
+                "https://github.com/jafkc2/KC-Overlay",
+            )));
 
             let go_back = button("Voltar").on_press(Message::ChangeScreen(Screen::Main));
 
@@ -153,70 +181,8 @@ pub fn get_screen(
 
             let main_column = column![discord_column, credits_column].height(COLUMN_HEIGHT);
 
-
             column![main_column, go_back].spacing(10).padding(10)
-        },
+        }
     }
 }
 
-fn button<'a>(content: impl Into<iced::Element<'a, Message, Theme, Renderer>>) -> iced::widget::Button<'a, Message, Theme, Renderer> {
-    iced::widget::button(content).style(move |_: &Theme, _| iced::widget::button::Style {
-        background: Some(Background::Color(Color::from_rgb8(30, 102, 245))),
-        text_color: Color::from_rgb8(255, 255, 255),
-        border: Border {
-            color: Color::from_rgb8(30, 102, 245),
-            width: 0.,
-            radius: Radius::new(10),
-        },
-        shadow: Shadow::default(),
-    })
-}
-
-fn secondary_button<'a>(content: impl Into<iced::Element<'a, Message, Theme, Renderer>>) -> iced::widget::Button<'a, Message, Theme, Renderer> {
-    iced::widget::button(content).style(move |_: &Theme, _| iced::widget::button::Style {
-        background: Some(Background::Color(Color::from_rgb8(64, 160, 43))),
-        text_color: Color::from_rgb8(255, 255, 255),
-        border: Border {
-            color: Color::from_rgb8(64, 160, 43),
-            width: 0.,
-            radius: Radius::new(10),
-        },
-        shadow: Shadow::default(),
-    })
-}
-
-pub fn pick_list<'a, T, L, V, Message>(
-    options: L,
-    selected: Option<V>,
-    on_selected: impl Fn(T) -> Message + 'a,
-) -> PickList<'a, T, L, V, Message, Theme, Renderer>
-where
-    T: ToString + PartialEq + Clone + 'a,
-    L: Borrow<[T]> + 'a,
-    V: Borrow<T> + 'a,
-    Message: Clone,
-{
-    iced::widget::pick_list(options, selected, on_selected)
-        .style(move |_: &Theme, _| iced::widget::pick_list::Style {
-            text_color: Color::from_rgb8(255, 255, 255),
-            placeholder_color: Color::from_rgb8(255, 255, 255),
-            handle_color: Color::from_rgb8(30, 102, 245),
-            background: Background::Color(Color::from_rgb8(54, 58, 79)),
-            border: Border {
-                color: Color::from_rgb8(54, 58, 79),
-                width: 0.,
-                radius: Radius::new(10),
-            },
-        })
-        .menu_style(|_| iced::overlay::menu::Style {
-            background: Background::Color(Color::from_rgb8(54, 58, 79)),
-            border: Border {
-                color: Color::from_rgb8(54, 58, 79),
-                width: 0.,
-                radius: Radius::new(10),
-            },
-            text_color: Color::from_rgb8(255, 255, 255),
-            selected_text_color: Color::from_rgb8(255, 255, 255),
-            selected_background: Background::Color(Color::from_rgb8(73, 77, 100)),
-        })
-}

@@ -1,6 +1,10 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 use std::{
-    env, fs::{self, File, OpenOptions}, io::{BufRead, BufReader, Seek, SeekFrom, Write}, path::Path, time::Duration
+    env,
+    fs::{self, File, OpenOptions},
+    io::{BufRead, BufReader, Seek, SeekFrom, Write},
+    path::Path,
+    time::Duration,
 };
 
 use iced::{
@@ -24,8 +28,9 @@ use util::RGB;
 
 mod config;
 mod screens;
-mod util;
 mod update;
+mod util;
+mod themed_widgets;
 
 fn main() {
     let old_exec = env::current_exe().unwrap().with_extension("old");
@@ -67,7 +72,7 @@ struct KCOverlay {
     loading: bool,
     client: MineClient,
     sender: Option<mpsc::Sender<MineClient>>,
-    update: Update
+    update: Update,
 }
 
 #[derive(Debug, Clone)]
@@ -85,7 +90,9 @@ enum Message {
     CheckedUpdates(Result<(String, String), String>),
     OpenLink(String),
     Update,
-    UpdateResult(Result<(), String>)
+    UpdateResult(Result<(), String>),
+    CustomClientPathModified(String),
+    SearchExplorer,
 }
 
 impl KCOverlay {
@@ -93,11 +100,16 @@ impl KCOverlay {
         let is_first_use = config::check_config_file();
 
         let config = config::get_config();
+        let custom_client_path = config["custom_client_path"]
+            .as_str()
+            .unwrap_or("")
+            .to_string();
         let client = match config["client"].as_i64().unwrap_or(0) {
             0 => MineClient::Default,
             1 => MineClient::Badlion,
             2 => MineClient::Lunar,
             3 => MineClient::LegacyLauncher,
+            4 => MineClient::Custom(custom_client_path),
             _ => MineClient::Default,
         };
 
@@ -116,7 +128,10 @@ impl KCOverlay {
                 sender: None,
                 update: Update::empty(),
             },
-            Task::batch(vec![Task::perform(update::check_updates(), Message::CheckedUpdates)]),
+            Task::batch(vec![Task::perform(
+                update::check_updates(),
+                Message::CheckedUpdates,
+            )]),
         )
     }
 
@@ -203,6 +218,16 @@ impl KCOverlay {
                     MineClient::Badlion => 1,
                     MineClient::Lunar => 2,
                     MineClient::LegacyLauncher => 3,
+                    MineClient::Custom(path) => {
+                        if !path.eq(" ") {
+                            config["custom_client_path"] = serde_json::json!(path);
+                        } else {
+                            let custom_client_path =
+                                config["custom_client_path"].as_str().unwrap().to_string();
+                            self.client = MineClient::Custom(custom_client_path)
+                        }
+                        4
+                    }
                 };
 
                 config["client"] = serde_json::json!(client_number);
@@ -253,7 +278,7 @@ impl KCOverlay {
             Message::CheckedUpdates(result) => {
                 match result {
                     Ok((url, last_version)) => {
-                        self.update = Update{
+                        self.update = Update {
                             available: true,
                             url,
                             last_version,
@@ -266,23 +291,30 @@ impl KCOverlay {
             Message::OpenLink(url) => {
                 open::that(url).unwrap();
                 Task::none()
-            },
+            }
             Message::Update => {
                 self.update.available = false;
-                Task::perform(update::install_update(self.update.url.clone()), Message::UpdateResult)
-            },
+                Task::perform(
+                    update::install_update(self.update.url.clone()),
+                    Message::UpdateResult,
+                )
+            }
             Message::UpdateResult(result) => {
-                match result{
+                match result {
                     Ok(_) => {
                         let exec_path = env::current_exe().unwrap();
 
-                        let exec_name = exec_path.clone().file_name().unwrap().to_string_lossy().to_string();
+                        let exec_name = exec_path
+                            .clone()
+                            .file_name()
+                            .unwrap()
+                            .to_string_lossy()
+                            .to_string();
 
                         // renames current executable to KC-Overlay.old and renames updated executable to KC-Overlay
                         fs::rename(&exec_path, exec_path.with_extension("old")).unwrap();
                         fs::rename(exec_path.with_extension("new"), exec_path).unwrap();
 
-                        
                         let mut new_exe_path = env::current_exe().unwrap();
                         new_exe_path.pop();
 
@@ -292,10 +324,27 @@ impl KCOverlay {
                             Ok(_) => std::process::exit(0),
                             Err(e) => panic!("{}", e),
                         }
-                    },
-                    Err(e) => {println!("{}", e); Task::none()},
+                    }
+                    Err(e) => {
+                        println!("{}", e);
+                        Task::none()
+                    }
                 }
-            },
+            }
+            Message::CustomClientPathModified(path) => {
+                Task::perform(async { MineClient::Custom(path) }, Message::ClientSelect)
+            }
+            Message::SearchExplorer => {
+                let file = rfd::FileDialog::new()
+                    .add_filter("logs", &["log"])
+                    .set_directory(util::get_home_dir());
+
+                let log_path = file.pick_file().unwrap().to_string_lossy().to_string();
+                Task::perform(
+                    async { MineClient::Custom(log_path) },
+                    Message::ClientSelect,
+                )
+            }
         }
     }
 
@@ -335,19 +384,52 @@ fn read_command() -> impl Stream<Item = LogReader> {
             MineClient::Badlion => format!("{}/logs/blclient/minecraft/latest.log", minecraft_dir),
             MineClient::Lunar => util::lunar_get_newer_logs_path(),
             MineClient::LegacyLauncher => util::get_legacy_launcher_dir(),
+            MineClient::Custom(path) => path,
         };
 
-        if !Path::new(&logs_path).exists() {
-            output
-                .send(LogReader::Log("AAAAAA!".to_string()))
-                .await
-                .unwrap();
-            output.disconnect();
-            return;
-        }
-        let file = File::open(&logs_path).unwrap();
+        let mut file = File::open(&logs_path);
 
-        let mut reader = BufReader::new(file);
+        match file {
+            Ok(ok) => {
+                file = Ok(ok);
+            }
+            Err(_) => {
+                while !Path::new(&logs_path).exists() {
+                    match receiver.try_next() {
+                        Ok(Some(message)) => {
+                            let logs_path = match message {
+                                MineClient::Default => format!("{}/logs/latest.log", minecraft_dir),
+                                MineClient::Badlion => {
+                                    format!("{}/logs/blclient/minecraft/latest.log", minecraft_dir)
+                                }
+                                MineClient::Lunar => util::lunar_get_newer_logs_path(),
+                                MineClient::LegacyLauncher => util::get_legacy_launcher_dir(),
+                                MineClient::Custom(path) => path,
+                            };
+
+                            match File::open(&logs_path) {
+                                Ok(ok) => {
+                                    file = Ok(ok);
+                                    break;
+                                }
+                                Err(e) => {
+                                    println!("{e}");
+                                    continue;
+                                }
+                            }
+                        }
+                        Ok(None) => {
+                            continue;
+                        }
+                        Err(_) => {
+                            continue;
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut reader = BufReader::new(file.unwrap());
         let mut buffer = String::new();
         reader.seek(SeekFrom::End(0)).unwrap();
 
@@ -373,14 +455,15 @@ fn read_command() -> impl Stream<Item = LogReader> {
                         }
                         MineClient::Lunar => util::lunar_get_newer_logs_path(),
                         MineClient::LegacyLauncher => util::get_legacy_launcher_dir(),
+                        MineClient::Custom(path) => path,
                     };
 
-                    let file = match File::open(&logs_path){
+                    let file = match File::open(&logs_path) {
                         Ok(ok) => ok,
                         Err(e) => {
                             println!("{e}");
                             continue;
-                        },
+                        }
                     };
 
                     reader = BufReader::new(file);
@@ -595,6 +678,7 @@ enum MineClient {
     Badlion,
     Lunar,
     LegacyLauncher,
+    Custom(String),
 }
 
 impl ToString for MineClient {
@@ -604,19 +688,24 @@ impl ToString for MineClient {
             MineClient::Badlion => "Badlion".to_string(),
             MineClient::Lunar => "Lunar".to_string(),
             MineClient::LegacyLauncher => "Legacy Launcher".to_string(),
+            MineClient::Custom(_) => "Personalizado".to_string(),
         }
     }
 }
 
 #[derive(Default)]
-struct Update{
-    available : bool,
+struct Update {
+    available: bool,
     url: String,
-    last_version : String
+    last_version: String,
 }
 
-impl Update{
-    fn empty() -> Self{
-        Self { available: false, url: String::new(), last_version: String::new() }
+impl Update {
+    fn empty() -> Self {
+        Self {
+            available: false,
+            url: String::new(),
+            last_version: String::new(),
+        }
     }
 }

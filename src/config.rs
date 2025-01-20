@@ -36,6 +36,12 @@ pub fn check_config_file() -> bool {
         if !map.contains_key("client") {
             map.insert("client".to_owned(), serde_json::to_value(0).unwrap());
         }
+        if !map.contains_key("custom_client_path") {
+            map.insert(
+                "custom_client_path".to_owned(),
+                serde_json::to_value("").unwrap(),
+            );
+        }
     }
 
     let serializedjson = serde_json::to_string_pretty(&conf_json).unwrap();
