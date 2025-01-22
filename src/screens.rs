@@ -1,7 +1,5 @@
 use iced::{
-    theme,
-    widget::{column, container, row, text, Column},
-    Color, Renderer
+    theme, widget::{column, container, row, text, Column}, Color, Font, Renderer
 };
 
 use crate::{themed_widgets::{button, pick_list, secondary_button, text_input}, Message, MineClient};
@@ -25,7 +23,7 @@ pub fn get_screen(
         Screen::Main => {
             let screen_title_text = if app.players.is_empty() {
                 String::from(
-                    "Digite o comando /jogando no chat do mush para ver os stats dos jogadores",
+                    "Digite o comando /jogando no chat do Mush para ver os stats dos jogadores",
                 )
             } else if app.loading {
                 String::from("Carregando jogadores...")
@@ -43,6 +41,13 @@ pub fn get_screen(
             let mut fkdr_column = Column::new();
 
             let players = app.players.clone();
+
+            if !players.is_empty(){
+                username_column = username_column.push(text("Nome"));
+                winstreak_column = winstreak_column.push(text("WS"));
+                winrate_column = winrate_column.push(text("Winrate"));
+                fkdr_column = fkdr_column.push(text("FKDR"));
+            }
             for player in players {
                 let clan = if let Some(value) = &player.clan {
                     format!("[{}]", value)
@@ -50,25 +55,22 @@ pub fn get_screen(
                     String::new()
                 };
 
-                let level_widget =
-                    text(format!("[{}] ", player.level)).color(player.level_color.to_color());
+                let level_widget = if player.is_nicked{
+                    row![text("[NICKED]").color(Color::from_rgb8(255, 255, 0))]
+                } else if player.is_possible_cheater{
+                    row![text("[possível CHEATER]").color(Color::from_rgb8(255, 0, 0)).size(12)]
+                } else {
+                    row![text(format!("[{}", player.level)).color(player.level_color.to_color()), text(player.level_symbol).font(Font::with_name("Noto Sans Symbols 2")).color(player.level_color.to_color()), text("]").color(player.level_color.to_color())]
+                };
+
                 let username_widget = text(player.username).color(player.username_color.to_color());
                 let clan_widget = text(clan).color(player.clan_color.to_color());
-                let winstreak_widget = text(format!("{} ws", player.winstreak));
-                let winrate_widget = text(format!("{:.2} winrate", player.winrate));
-                let fkdr = text(format!("{:.2} fkdr", player.final_kill_final_death_ratio));
+                let winstreak_widget = text(format!("{}", player.winstreak));
+                let winrate_widget = text(format!("{:.2}", player.winrate));
+                let fkdr = text(format!("{:.2}", player.final_kill_final_death_ratio));
 
-                let mut username_row = row![level_widget, username_widget, clan_widget];
-                if player.is_nicked {
-                    username_row =
-                        username_row.push(text("</nick>").color(Color::from_rgb8(255, 255, 0)))
-                } else if player.is_possible_cheater {
-                    username_row = username_row.push(
-                        text("<possível CHEATER>")
-                            .color(Color::from_rgb8(255, 0, 0))
-                            .size(12),
-                    )
-                }
+                let username_row = row![level_widget, username_widget, clan_widget];
+
                 username_column = username_column.push(username_row);
                 winstreak_column = winstreak_column.push(winstreak_widget);
                 winrate_column = winrate_column.push(winrate_widget);
@@ -80,7 +82,7 @@ pub fn get_screen(
                 winrate_column,
                 fkdr_column
             ]
-            .spacing(10);
+            .spacing(15);
             let container = container(column_row);
 
             let settings =
@@ -162,7 +164,7 @@ pub fn get_screen(
         }
         Screen::Info => {
             let thanks_text = text("Muito obrigado por usar o KC Overlay! Considere virar membro do Discord para saber das novidades");
-            let discord_button = button("Entrar no discord").on_press(Message::OpenLink(
+            let discord_button = button("Entrar no Discord").on_press(Message::OpenLink(
                 String::from("https://discord.gg/SqT7YHSGzJ"),
             ));
 

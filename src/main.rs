@@ -8,17 +8,10 @@ use std::{
 };
 
 use iced::{
-    event,
-    futures::{
+    event, futures::{
         channel::mpsc::{self, Sender},
         SinkExt, Stream, StreamExt,
-    },
-    mouse::Button,
-    stream,
-    theme::Style,
-    time,
-    window::{self, Position, Settings},
-    Color, Element, Point, Size, Subscription, Task,
+    }, mouse::Button, stream, theme::Style, time, window::{self, Position, Settings}, Color, Element, Font, Point, Size, Subscription, Task
 };
 use reqwest::Client;
 use screens::Screen;
@@ -43,6 +36,7 @@ fn main() {
 
     let icon = include_bytes!("../assets/icon.png");
 
+
     iced::application(KCOverlay::title, KCOverlay::update, KCOverlay::view)
         .subscription(KCOverlay::subscription)
         .resizable(false)
@@ -61,6 +55,10 @@ fn main() {
             background_color: Color::from_rgba8(24, 25, 33, 0.75),
             text_color: Color::WHITE,
         })
+        .font(KCOverlay::FONT)
+        .font(KCOverlay::SYMBOL_FONT)
+        .default_font(Font::with_name("Manrope"))
+        .scale_factor(KCOverlay::scale_factor)
         .run_with(KCOverlay::new)
         .unwrap();
 }
@@ -96,6 +94,10 @@ enum Message {
 }
 
 impl KCOverlay {
+    const FONT: &'static [u8] = include_bytes!("../fonts/Manrope-Regular.ttf");
+    const SYMBOL_FONT: &'static [u8] = include_bytes!("../fonts/NotoSansSymbols2-Regular.ttf");
+
+
     fn new() -> (Self, Task<Message>) {
         let is_first_use = config::check_config_file();
 
@@ -361,6 +363,10 @@ impl KCOverlay {
             time::every(Duration::from_secs(20)).map(move |_| Message::ClientUpdate);
 
         Subscription::batch(vec![event, command_reader, client_updater])
+    }
+
+    fn scale_factor(&self) -> f64{
+        1.0
     }
 }
 
