@@ -1,8 +1,13 @@
 use iced::{
-    theme, widget::{column, container, row, text, Column}, Color, Font, Renderer
+    theme,
+    widget::{column, container, row, text, Column},
+    Color, Font, Renderer,
 };
 
-use crate::{themed_widgets::{button, pick_list, secondary_button, text_input}, Message, MineClient};
+use crate::{
+    themed_widgets::{button, pick_list, secondary_button, text_input},
+    Message, MineClient,
+};
 
 #[derive(Clone, Copy, Default, Debug)]
 pub enum Screen {
@@ -42,7 +47,7 @@ pub fn get_screen(
 
             let players = app.players.clone();
 
-            if !players.is_empty(){
+            if !players.is_empty() {
                 username_column = username_column.push(text("Nome"));
                 winstreak_column = winstreak_column.push(text("WS"));
                 winrate_column = winrate_column.push(text("Winrate"));
@@ -55,12 +60,20 @@ pub fn get_screen(
                     String::new()
                 };
 
-                let level_widget = if player.is_nicked{
+                let level_widget = if player.is_nicked {
                     row![text("[NICKED]").color(Color::from_rgb8(255, 255, 0))]
-                } else if player.is_possible_cheater{
-                    row![text("[possível CHEATER]").color(Color::from_rgb8(255, 0, 0)).size(12)]
+                } else if player.is_possible_cheater {
+                    row![text("[possível CHEATER]")
+                        .color(Color::from_rgb8(255, 0, 0))
+                        .size(12)]
                 } else {
-                    row![text(format!("[{}", player.level)).color(player.level_color.to_color()), text(player.level_symbol).font(Font::with_name("Noto Sans Symbols 2")).color(player.level_color.to_color()), text("]").color(player.level_color.to_color())]
+                    row![
+                        text(format!("[{}", player.level)).color(player.level_color.to_color()),
+                        text(player.level_symbol)
+                            .font(Font::with_name("Noto Sans Symbols 2"))
+                            .color(player.level_color.to_color()),
+                        text("]").color(player.level_color.to_color())
+                    ]
                 };
 
                 let username_widget = text(player.username).color(player.username_color.to_color());
@@ -120,9 +133,8 @@ pub fn get_screen(
             match &app.client {
                 MineClient::Custom(path) => {
                     let custom_client_text = text("Último log do client (ex: logs/latest.log):");
-                    let custom_client_path =
-                        text_input("Insira o último arquivo de log", &path)
-                            .on_input(Message::CustomClientPathModified);
+                    let custom_client_path = text_input("Insira o último arquivo de log", &path)
+                        .on_input(Message::CustomClientPathModified);
                     let custom_client_search = button("Procurar").on_press(Message::SearchExplorer);
 
                     let custom_client_row =
@@ -187,4 +199,3 @@ pub fn get_screen(
         }
     }
 }
-

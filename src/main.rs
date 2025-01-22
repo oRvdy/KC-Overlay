@@ -8,10 +8,18 @@ use std::{
 };
 
 use iced::{
-    event, futures::{
+    event,
+    futures::{
         channel::mpsc::{self, Sender},
+        executor::block_on,
         SinkExt, Stream, StreamExt,
-    }, mouse::Button, stream, theme::Style, time, window::{self, Position, Settings}, Color, Element, Font, Point, Size, Subscription, Task
+    },
+    mouse::Button,
+    stream,
+    theme::Style,
+    time,
+    window::{self, Position, Settings},
+    Color, Element, Font, Point, Size, Subscription, Task,
 };
 use reqwest::Client;
 use screens::Screen;
@@ -21,9 +29,9 @@ use util::RGB;
 
 mod config;
 mod screens;
+mod themed_widgets;
 mod update;
 mod util;
-mod themed_widgets;
 
 fn main() {
     let old_exec = env::current_exe().unwrap().with_extension("old");
@@ -35,7 +43,6 @@ fn main() {
     }
 
     let icon = include_bytes!("../assets/icon.png");
-
 
     iced::application(KCOverlay::title, KCOverlay::update, KCOverlay::view)
         .subscription(KCOverlay::subscription)
@@ -69,7 +76,8 @@ struct KCOverlay {
     players: Vec<Player>,
     loading: bool,
     client: MineClient,
-    sender: Option<mpsc::Sender<MineClient>>,
+    logs_sender: Option<mpsc::Sender<MineClient>>,
+    player_getter_sender: Option<mpsc::Sender<()>>,
     update: Update,
 }
 
@@ -96,7 +104,6 @@ enum Message {
 impl KCOverlay {
     const FONT: &'static [u8] = include_bytes!("../fonts/Manrope-Regular.ttf");
     const SYMBOL_FONT: &'static [u8] = include_bytes!("../fonts/NotoSansSymbols2-Regular.ttf");
-
 
     fn new() -> (Self, Task<Message>) {
         let is_first_use = config::check_config_file();
@@ -127,7 +134,8 @@ impl KCOverlay {
                 players: vec![],
                 loading: false,
                 client,
-                sender: None,
+                logs_sender: None,
+                player_getter_sender: None,
                 update: Update::empty(),
             },
             Task::batch(vec![Task::perform(
@@ -182,7 +190,7 @@ impl KCOverlay {
                 }
                 LogReader::Sender(mut sender) => {
                     let client = self.client.clone();
-                    self.sender = Some(sender.clone());
+                    self.logs_sender = Some(sender.clone());
                     Task::future(async move { sender.send(client).await.unwrap() }).discard()
                 }
             },
@@ -248,7 +256,7 @@ impl KCOverlay {
                     _ => (),
                 }
 
-                match &self.sender {
+                match &self.logs_sender {
                     Some(sender) => Task::perform(
                         update_client(sender.clone(), self.client.clone()),
                         Message::None,
@@ -257,7 +265,7 @@ impl KCOverlay {
                 }
             }
             Message::Minimize => window::get_latest().and_then(|x| window::minimize(x, true)),
-            Message::ClientUpdate => match &self.sender {
+            Message::ClientUpdate => match &self.logs_sender {
                 Some(sender) => Task::perform(
                     update_client(sender.clone(), self.client.clone()),
                     Message::None,
@@ -274,7 +282,20 @@ impl KCOverlay {
                 }
                 PlayerSender::Done => {
                     self.loading = false;
+                    self.player_getter_sender = None;
                     Task::perform(util::wait(Duration::from_secs(10)), Message::ChangeLevel)
+                }
+                PlayerSender::Sender(new_sender) => {
+                    match self.player_getter_sender.clone() {
+                        Some(mut sender) => {
+                            block_on(async {
+                                sender.send(()).await.unwrap();
+                            });
+                            self.player_getter_sender = Some(new_sender)
+                        }
+                        None => self.player_getter_sender = Some(new_sender),
+                    }
+                    Task::none()
                 }
             },
             Message::CheckedUpdates(result) => {
@@ -365,7 +386,7 @@ impl KCOverlay {
         Subscription::batch(vec![event, command_reader, client_updater])
     }
 
-    fn scale_factor(&self) -> f64{
+    fn scale_factor(&self) -> f64 {
         1.0
     }
 }
@@ -486,12 +507,18 @@ fn read_command() -> impl Stream<Item = LogReader> {
 #[derive(Clone, Debug)]
 enum PlayerSender {
     Player(Player),
+    Sender(mpsc::Sender<()>),
     Done,
 }
 fn get_players(str_player_list: Vec<String>) -> impl Stream<Item = PlayerSender> {
     stream::channel(100, |mut output| async move {
+        let (sender, mut receiver) = mpsc::channel(100);
+
+        output.send(PlayerSender::Sender(sender)).await.unwrap();
         let client = Client::new();
         const MUSH_API: &str = "https://mush.com.br/api/player/";
+
+        let mut interrupted = false;
 
         for i in str_player_list {
             let url = format!("{}{}", MUSH_API, i);
@@ -553,10 +580,21 @@ fn get_players(str_player_list: Vec<String>) -> impl Stream<Item = PlayerSender>
             let bedwars_stats = response["stats"]["bedwars"].clone();
             if bedwars_stats.is_object() {
                 let level = bedwars_stats["level"].as_i64().unwrap_or(0);
-                let level_symbol = bedwars_stats["level_badge"]["symbol"]
+                let level_symbol_raw: String = bedwars_stats["level_badge"]["format"]
                     .as_str()
                     .unwrap()
                     .to_string();
+
+                let level_symbol = level_symbol_raw
+                    .chars()
+                    .find(|c| {
+                        !c.is_ascii_alphanumeric()
+                            && !c.is_ascii_whitespace()
+                            && !c.is_ascii_punctuation()
+                    })
+                    .unwrap()
+                    .to_string();
+
                 let level_color = bedwars_stats["level_badge"]["hex_color"]
                     .as_str()
                     .unwrap()
@@ -586,9 +624,19 @@ fn get_players(str_player_list: Vec<String>) -> impl Stream<Item = PlayerSender>
                     .await
                     .unwrap();
             }
+            // Check for stop order
+            match receiver.try_next() {
+                Ok(_) => {
+                    interrupted = true;
+                    break;
+                }
+                Err(_) => (),
+            }
             sleep(Duration::from_millis(50)).await;
         }
-        output.send(PlayerSender::Done).await.unwrap();
+        if !interrupted {
+            output.send(PlayerSender::Done).await.unwrap();
+        }
     })
 }
 

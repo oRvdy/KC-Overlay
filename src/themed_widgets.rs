@@ -1,26 +1,30 @@
 use std::borrow::Borrow;
 
-use iced::{border::Radius, widget::{PickList, TextInput}, Background, Border, Color, Renderer, Shadow, Theme};
+use iced::{
+    border::Radius,
+    widget::{PickList, TextInput},
+    Background, Border, Color, Renderer, Shadow, Theme,
+};
 
 use crate::Message;
 
-enum Colors{
+enum Colors {
     WidgetBackground,
     WidgedBackgroundHighlight,
     ButtonColor,
     SecondaryButtonColor,
     TextColor,
-    GrayTextColor
+    GrayTextColor,
 }
-impl Colors{
-    fn get(&self) -> Color{
-        match self{
+impl Colors {
+    fn get(&self) -> Color {
+        match self {
             Colors::WidgetBackground => Color::from_rgb8(54, 58, 79),
             Colors::WidgedBackgroundHighlight => Color::from_rgb8(73, 77, 100),
             Colors::ButtonColor => Color::from_rgb8(30, 102, 245),
             Colors::SecondaryButtonColor => Color::from_rgb8(64, 160, 43),
             Colors::TextColor => Color::from_rgb8(255, 255, 255),
-            Colors::GrayTextColor => Color::from_rgb8(200, 200, 200)
+            Colors::GrayTextColor => Color::from_rgb8(200, 200, 200),
         }
     }
 }
@@ -97,7 +101,7 @@ pub fn text_input<'a, Message>(
 where
     Message: Clone,
 {
-    iced::widget::text_input(placeholder, value).style(|_, _| iced::widget::text_input::Style{
+    iced::widget::text_input(placeholder, value).style(|_, _| iced::widget::text_input::Style {
         background: Background::Color(Colors::WidgetBackground.get()),
         border: Border {
             color: Colors::WidgetBackground.get(),
