@@ -7,7 +7,7 @@ use std::{
 use reqwest::header::{HeaderValue, USER_AGENT};
 use serde_json::Value;
 
-pub async fn check_updates() -> Result<(String, String), String> {
+pub async fn check_updates() -> Result<String, String> {
     let last_release_request = match reqwest::Client::new()
         .get("https://api.github.com/repos/jafkc2/KC-Overlay/releases/latest")
         .header(USER_AGENT, HeaderValue::from_static("KC-Overlay"))
@@ -64,7 +64,7 @@ pub async fn check_updates() -> Result<(String, String), String> {
                 }
             }
         }
-        Ok((url, latest_version.to_string()))
+        Ok(url)
     } else {
         Err("KC-Overlay está atualizado.".to_string())
     }
@@ -72,16 +72,16 @@ pub async fn check_updates() -> Result<(String, String), String> {
 
 pub async fn install_update(url: String) -> Result<(), String> {
     let exec_path = env::current_exe().unwrap();
-    let mut exec_file = File::create(&exec_path.with_extension("new")).unwrap();
+    let mut exec_file = File::create(exec_path.with_extension("new")).unwrap();
 
     #[cfg(target_os = "linux")]
     {
         use std::os::unix::fs::PermissionsExt;
-        let mut permission = fs::metadata(&exec_path.with_extension("new"))
+        let mut permission = fs::metadata(exec_path.with_extension("new"))
             .unwrap()
             .permissions();
         permission.set_mode(0o755);
-        fs::set_permissions(&exec_path.with_extension("new"), permission).unwrap();
+        fs::set_permissions(exec_path.with_extension("new"), permission).unwrap();
     }
 
     println!("{url}");

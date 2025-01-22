@@ -82,7 +82,7 @@ pub fn get_screen(
                 let winrate_widget = text(format!("{:.2}", player.winrate));
                 let fkdr = text(format!("{:.2}", player.final_kill_final_death_ratio));
 
-                let username_row = row![level_widget, username_widget, clan_widget];
+                let username_row = row![level_widget, username_widget, clan_widget].spacing(5);
 
                 username_column = username_column.push(username_row);
                 winstreak_column = winstreak_column.push(winstreak_widget);
@@ -130,21 +130,17 @@ pub fn get_screen(
 
             let mut main_column = column![client_row].spacing(10).height(COLUMN_HEIGHT);
 
-            match &app.client {
-                MineClient::Custom(path) => {
-                    let custom_client_text = text("Último log do client (ex: logs/latest.log):");
-                    let custom_client_path = text_input("Insira o último arquivo de log", &path)
-                        .on_input(Message::CustomClientPathModified);
-                    let custom_client_search = button("Procurar").on_press(Message::SearchExplorer);
+            if let MineClient::Custom(path) = &app.client {
+                let custom_client_text = text("Último log do client (ex: logs/latest.log):");
+                let custom_client_path = text_input("Insira o último arquivo de log", path)
+                    .on_input(Message::CustomClientPathModified);
+                let custom_client_search = button("Procurar").on_press(Message::SearchExplorer);
 
-                    let custom_client_row =
-                        row![custom_client_path, custom_client_search].spacing(10);
+                let custom_client_row = row![custom_client_path, custom_client_search].spacing(10);
 
-                    main_column = main_column
-                        .push(column![custom_client_text, custom_client_row])
-                        .spacing(10)
-                }
-                _ => (),
+                main_column = main_column
+                    .push(column![custom_client_text, custom_client_row])
+                    .spacing(10)
             }
 
             column![main_column, go_back].padding(10).spacing(10)

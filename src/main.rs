@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 use std::{
     env,
+    fmt::Display,
     fs::{self, File, OpenOptions},
     io::{BufRead, BufReader, Seek, SeekFrom, Write},
     path::Path,
@@ -25,7 +26,7 @@ use reqwest::Client;
 use screens::Screen;
 use serde_json::Value;
 use tokio::time::sleep;
-use util::RGB;
+use util::Rgb;
 
 mod config;
 mod screens;
@@ -83,17 +84,16 @@ struct KCOverlay {
 
 #[derive(Debug, Clone)]
 enum Message {
-    None(bool),
     ChangeScreen(Screen),
     Log(LogReader),
-    ChangeLevel(bool),
+    ChangeLevel,
     GotEvent(event::Event),
     Close,
     ClientSelect(MineClient),
     ClientUpdate,
     Minimize,
     PlayerSender(PlayerSender),
-    CheckedUpdates(Result<(String, String), String>),
+    CheckedUpdates(Result<String, String>),
     OpenLink(String),
     Update,
     UpdateResult(Result<(), String>),
@@ -151,8 +151,6 @@ impl KCOverlay {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::None(_) => Task::none(),
-
             Message::ChangeScreen(screen) => {
                 self.screen = screen;
                 Task::none()
@@ -194,7 +192,7 @@ impl KCOverlay {
                     Task::future(async move { sender.send(client).await.unwrap() }).discard()
                 }
             },
-            Message::ChangeLevel(_) => {
+            Message::ChangeLevel => {
                 if self.loading {
                     Task::none()
                 } else {
@@ -206,16 +204,9 @@ impl KCOverlay {
                 }
             }
             Message::GotEvent(event) => match event {
-                iced::Event::Mouse(event) => match event {
-                    iced::mouse::Event::ButtonPressed(button) => {
-                        if button == Button::Left {
-                            window::get_latest().and_then(|x| window::drag(x))
-                        } else {
-                            Task::none()
-                        }
-                    }
-                    _ => Task::none(),
-                },
+                iced::Event::Mouse(iced::mouse::Event::ButtonPressed(Button::Left)) => {
+                    window::get_latest().and_then(window::drag)
+                }
                 _ => Task::none(),
             },
             Message::Close => window::get_latest().and_then(window::close),
@@ -251,25 +242,22 @@ impl KCOverlay {
                     .write_all(serde_json::to_string_pretty(&config).unwrap().as_bytes())
                     .unwrap();
 
-                match self.screen {
-                    Screen::Welcome => self.screen = Screen::Main,
-                    _ => (),
+                if let Screen::Welcome = self.screen {
+                    self.screen = Screen::Main
                 }
 
                 match &self.logs_sender {
-                    Some(sender) => Task::perform(
-                        update_client(sender.clone(), self.client.clone()),
-                        Message::None,
-                    ),
+                    Some(sender) => {
+                        Task::future(update_client(sender.clone(), self.client.clone())).discard()
+                    }
                     None => Task::none(),
                 }
             }
             Message::Minimize => window::get_latest().and_then(|x| window::minimize(x, true)),
             Message::ClientUpdate => match &self.logs_sender {
-                Some(sender) => Task::perform(
-                    update_client(sender.clone(), self.client.clone()),
-                    Message::None,
-                ),
+                Some(sender) => {
+                    Task::future(update_client(sender.clone(), self.client.clone())).discard()
+                }
                 None => Task::none(),
             },
             Message::PlayerSender(player_sender) => match player_sender {
@@ -283,7 +271,9 @@ impl KCOverlay {
                 PlayerSender::Done => {
                     self.loading = false;
                     self.player_getter_sender = None;
-                    Task::perform(util::wait(Duration::from_secs(10)), Message::ChangeLevel)
+                    Task::perform(util::wait(Duration::from_secs(10)), |_| {
+                        Message::ChangeLevel
+                    })
                 }
                 PlayerSender::Sender(new_sender) => {
                     match self.player_getter_sender.clone() {
@@ -300,11 +290,10 @@ impl KCOverlay {
             },
             Message::CheckedUpdates(result) => {
                 match result {
-                    Ok((url, last_version)) => {
+                    Ok(url) => {
                         self.update = Update {
                             available: true,
                             url,
-                            last_version,
                         }
                     }
                     Err(e) => println!("{e}"),
@@ -611,26 +600,23 @@ fn get_players(str_player_list: Vec<String>) -> impl Stream<Item = PlayerSender>
                 output
                     .send(PlayerSender::Player(Player::new(
                         i,
-                        RGB::from_hex(username_color),
+                        Rgb::from_hex(username_color),
                         level as i32,
                         level_symbol,
                         winstreak as i32,
                         clan,
-                        RGB::from_hex(clan_color),
+                        Rgb::from_hex(clan_color),
                         winrate,
                         final_kill_final_death_ratio,
-                        RGB::from_hex(&level_color),
+                        Rgb::from_hex(&level_color),
                     )))
                     .await
                     .unwrap();
             }
             // Check for stop order
-            match receiver.try_next() {
-                Ok(_) => {
-                    interrupted = true;
-                    break;
-                }
-                Err(_) => (),
+            if receiver.try_next().is_ok() {
+                interrupted = true;
+                break;
             }
             sleep(Duration::from_millis(50)).await;
         }
@@ -640,39 +626,38 @@ fn get_players(str_player_list: Vec<String>) -> impl Stream<Item = PlayerSender>
     })
 }
 
-async fn update_client(mut sender: Sender<MineClient>, client: MineClient) -> bool {
+async fn update_client(mut sender: Sender<MineClient>, client: MineClient) {
     sender.send(client).await.unwrap();
-    true
 }
 
 #[derive(Debug, Clone)]
 struct Player {
     username: String,
-    username_color: RGB,
+    username_color: Rgb,
     level: i32,
     level_symbol: String,
     winstreak: i32,
     clan: Option<String>,
-    clan_color: RGB,
+    clan_color: Rgb,
     is_nicked: bool,
     is_possible_cheater: bool,
     winrate: f32,
     final_kill_final_death_ratio: f32,
-    level_color: RGB,
+    level_color: Rgb,
 }
 
 impl Player {
     fn new(
         username: String,
-        username_color: RGB,
+        username_color: Rgb,
         level: i32,
         level_symbol: String,
         winstreak: i32,
         clan: Option<String>,
-        clan_color: RGB,
+        clan_color: Rgb,
         winrate: f32,
         final_kill_final_death_ratio: f32,
-        level_color: RGB,
+        level_color: Rgb,
     ) -> Self {
         Player {
             username,
@@ -693,34 +678,34 @@ impl Player {
     fn new_nicked(username: String) -> Self {
         Player {
             username,
-            username_color: RGB::new(0, 255, 255),
+            username_color: Rgb::new(0, 255, 255),
             level: 999,
             level_symbol: "?".to_string(),
             winstreak: 0,
             clan: None,
-            clan_color: RGB::new(0, 0, 0),
+            clan_color: Rgb::new(0, 0, 0),
             is_nicked: true,
             is_possible_cheater: false,
             winrate: 0.,
             final_kill_final_death_ratio: 0.,
-            level_color: RGB::new(0, 255, 255),
+            level_color: Rgb::new(0, 255, 255),
         }
     }
 
     fn new_possible_cheater(username: String) -> Self {
         Player {
             username,
-            username_color: RGB::new(255, 0, 0),
+            username_color: Rgb::new(255, 0, 0),
             level: 999,
             level_symbol: "?".to_string(),
             winstreak: 0,
             clan: None,
-            clan_color: RGB::new(0, 0, 0),
+            clan_color: Rgb::new(0, 0, 0),
             is_nicked: false,
             is_possible_cheater: true,
             winrate: 0.,
             final_kill_final_death_ratio: 0.,
-            level_color: RGB::new(0, 255, 255),
+            level_color: Rgb::new(0, 255, 255),
         }
     }
 }
@@ -735,14 +720,14 @@ enum MineClient {
     Custom(String),
 }
 
-impl ToString for MineClient {
-    fn to_string(&self) -> String {
+impl Display for MineClient {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            MineClient::Default => "Geral".to_string(),
-            MineClient::Badlion => "Badlion".to_string(),
-            MineClient::Lunar => "Lunar".to_string(),
-            MineClient::LegacyLauncher => "Legacy Launcher".to_string(),
-            MineClient::Custom(_) => "Personalizado".to_string(),
+            MineClient::Default => write!(f, "Geral"),
+            MineClient::Badlion => write!(f, "Badlion"),
+            MineClient::Lunar => write!(f, "Lunar"),
+            MineClient::LegacyLauncher => write!(f, "Legacy Launcher"),
+            MineClient::Custom(_) => write!(f, "Personalizado"),
         }
     }
 }
@@ -751,7 +736,6 @@ impl ToString for MineClient {
 struct Update {
     available: bool,
     url: String,
-    last_version: String,
 }
 
 impl Update {
@@ -759,7 +743,6 @@ impl Update {
         Self {
             available: false,
             url: String::new(),
-            last_version: String::new(),
         }
     }
 }

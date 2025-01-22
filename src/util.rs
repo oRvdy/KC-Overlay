@@ -11,7 +11,7 @@ use tokio::time::sleep;
 
 pub fn get_home_dir() -> String {
     match std::env::consts::OS {
-        "linux" => format!("{}", std::env::var("HOME").unwrap()),
+        "linux" => std::env::var("HOME").unwrap().to_string(),
         "windows" => format!(
             "{}/AppData/Roaming",
             std::env::var("USERPROFILE").unwrap().replace('\\', "/")
@@ -83,15 +83,15 @@ pub fn lunar_get_newer_logs_path() -> String {
 }
 
 #[derive(Debug, Clone)]
-pub struct RGB {
+pub struct Rgb {
     red: u8,
     green: u8,
     blue: u8,
 }
 
-impl RGB {
+impl Rgb {
     pub fn new(r: u8, g: u8, b: u8) -> Self {
-        RGB {
+        Rgb {
             red: r,
             green: g,
             blue: b,
@@ -104,7 +104,7 @@ impl RGB {
         let green = u8::from_str_radix(&hex[2..4], 16).unwrap();
         let blue = u8::from_str_radix(&hex[4..6], 16).unwrap();
 
-        RGB { red, green, blue }
+        Rgb { red, green, blue }
     }
 
     pub fn to_color(&self) -> Color {

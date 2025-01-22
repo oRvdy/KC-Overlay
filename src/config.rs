@@ -7,10 +7,10 @@ use std::{
 use serde_json::Value;
 
 pub fn get_config_file_path() -> String {
-    return format!(
+    format!(
         "{}/kc_overlay_config.json",
         super::util::get_minecraft_dir()
-    );
+    )
 }
 
 pub fn get_config() -> Value {
