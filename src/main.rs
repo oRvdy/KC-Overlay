@@ -80,6 +80,7 @@ struct KCOverlay {
     logs_sender: Option<mpsc::Sender<MineClient>>,
     player_getter_sender: Option<mpsc::Sender<()>>,
     update: Update,
+    never_minimize: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -99,6 +100,7 @@ enum Message {
     UpdateResult(Result<(), String>),
     CustomClientPathModified(String),
     SearchExplorer,
+    ChangeNeverMinimize(bool),
 }
 
 impl KCOverlay {
@@ -122,6 +124,7 @@ impl KCOverlay {
             5 => MineClient::Silent,
             _ => MineClient::Default,
         };
+        let never_minimize = config["never_minimize"].as_bool().unwrap_or(false);
 
         let screen = if is_first_use {
             Screen::Welcome
@@ -138,6 +141,7 @@ impl KCOverlay {
                 logs_sender: None,
                 player_getter_sender: None,
                 update: Update::empty(),
+                never_minimize,
             },
             Task::batch(vec![Task::perform(
                 update::check_updates(),
@@ -199,9 +203,13 @@ impl KCOverlay {
                 } else {
                     self.players.clear();
 
-                    Task::batch(vec![
-                        window::get_latest().and_then(|x| window::minimize(x, true))
-                    ])
+                    if self.never_minimize {
+                        Task::none()
+                    } else {
+                        Task::batch(vec![
+                            window::get_latest().and_then(|x| window::minimize(x, true))
+                        ])
+                    }
                 }
             }
             Message::GotEvent(event) => match event {
@@ -359,6 +367,11 @@ impl KCOverlay {
                     Message::ClientSelect,
                 )
             }
+            Message::ChangeNeverMinimize(bool) => {
+                self.never_minimize = bool;
+                config::save_settings(Some(bool));
+                Task::none()
+            }
         }
     }
 
@@ -424,7 +437,9 @@ fn read_command() -> impl Stream<Item = LogReader> {
                                 MineClient::Lunar => util::lunar_get_newer_logs_path(),
                                 MineClient::LegacyLauncher => util::get_legacy_launcher_dir(),
                                 MineClient::Custom(path) => path,
-                                MineClient::Silent => format!("{}/silentclient/logs/main.log", util::get_home_dir()),
+                                MineClient::Silent => {
+                                    format!("{}/silentclient/logs/main.log", util::get_home_dir())
+                                }
                             };
 
                             match File::open(&logs_path) {
@@ -476,7 +491,9 @@ fn read_command() -> impl Stream<Item = LogReader> {
                         MineClient::Lunar => util::lunar_get_newer_logs_path(),
                         MineClient::LegacyLauncher => util::get_legacy_launcher_dir(),
                         MineClient::Custom(path) => path,
-                        MineClient::Silent => format!("{}/silentclient/logs/main.log", util::get_home_dir()),
+                        MineClient::Silent => {
+                            format!("{}/silentclient/logs/main.log", util::get_home_dir())
+                        }
                     };
 
                     let file = match File::open(&logs_path) {
@@ -723,7 +740,7 @@ enum MineClient {
     Lunar,
     LegacyLauncher,
     Custom(String),
-    Silent
+    Silent,
 }
 
 impl Display for MineClient {

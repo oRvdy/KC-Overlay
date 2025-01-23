@@ -1,5 +1,5 @@
 use std::{
-    fs::{self, File},
+    fs::{self, File, OpenOptions},
     io::Write,
     path::Path,
 };
@@ -42,6 +42,12 @@ pub fn check_config_file() -> bool {
                 serde_json::to_value("").unwrap(),
             );
         }
+        if !map.contains_key("never_minimize") {
+            map.insert(
+                "never_minimize".to_owned(),
+                serde_json::to_value(false).unwrap(),
+            );
+        }
     }
 
     let serializedjson = serde_json::to_string_pretty(&conf_json).unwrap();
@@ -49,4 +55,21 @@ pub fn check_config_file() -> bool {
     file.write_all(serializedjson.as_bytes()).unwrap();
 
     !file_exists
+}
+
+pub fn save_settings(never_minimize: Option<bool>) {
+    let mut config = get_config();
+
+    if let Some(never_minimize_option) = never_minimize {
+        config["never_minimize"] = serde_json::json!(never_minimize_option)
+    }
+
+    let mut config_file = OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open(get_config_file_path())
+        .unwrap();
+    config_file
+        .write_all(serde_json::to_string_pretty(&config).unwrap().as_bytes())
+        .unwrap();
 }

@@ -5,7 +5,7 @@ use iced::{
 };
 
 use crate::{
-    themed_widgets::{button, pick_list, secondary_button, text_input},
+    themed_widgets::{button, pick_list, secondary_button, text_input, toggler},
     Message, MineClient,
 };
 
@@ -129,7 +129,7 @@ pub fn get_screen(
 
             let go_back = button("Voltar").on_press(Message::ChangeScreen(Screen::Main));
 
-            let mut main_column = column![client_row].spacing(10).height(COLUMN_HEIGHT);
+            let mut main_column = column![client_row].spacing(20).height(COLUMN_HEIGHT);
 
             if let MineClient::Custom(path) = &app.client {
                 let custom_client_text = text("Último log do client (ex: logs/latest.log):");
@@ -143,6 +143,13 @@ pub fn get_screen(
                     .push(column![custom_client_text, custom_client_row])
                     .spacing(10)
             }
+
+            let never_minimize_toggler =
+                toggler(app.never_minimize).on_toggle(Message::ChangeNeverMinimize).size(20);
+            let never_minimize_text = text("Nunca minimizar automaticamente");
+            let never_minimize_row = row![never_minimize_toggler, never_minimize_text].spacing(10);
+
+            main_column = main_column.push(never_minimize_row);
 
             column![main_column, go_back].padding(10).spacing(10)
         }
@@ -161,7 +168,8 @@ pub fn get_screen(
             let legacy_launcher = button("Legacy Launcher")
                 .on_press(Message::ClientSelect(MineClient::LegacyLauncher));
 
-            let silent_client = button("Silent Client").on_press(Message::ClientSelect(MineClient::Silent));
+            let silent_client =
+                button("Silent Client").on_press(Message::ClientSelect(MineClient::Silent));
 
             column![
                 welcome_text,

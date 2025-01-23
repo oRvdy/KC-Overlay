@@ -114,3 +114,14 @@ where
         selection: Colors::ButtonColor.get(),
     })
 }
+
+pub fn toggler<'a>(is_checked: bool) -> iced::widget::Toggler<'a, Message, Theme, Renderer> {
+    iced::widget::toggler(is_checked).style(|_, _| iced::widget::toggler::Style {
+        background: Colors::WidgetBackground.get(),
+        background_border_width: 0.,
+        background_border_color: Colors::ButtonColor.get(),
+        foreground: Colors::ButtonColor.get(),
+        foreground_border_width: 0.,
+        foreground_border_color: Colors::ButtonColor.get(),
+    })
+}
