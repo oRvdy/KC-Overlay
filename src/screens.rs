@@ -121,6 +121,7 @@ pub fn get_screen(
                 MineClient::Badlion,
                 MineClient::Lunar,
                 MineClient::LegacyLauncher,
+                MineClient::Silent,
                 MineClient::Custom(" ".to_string()),
             ];
             let client_select = pick_list(clients, Some(app.client.clone()), Message::ClientSelect);
@@ -160,12 +161,15 @@ pub fn get_screen(
             let legacy_launcher = button("Legacy Launcher")
                 .on_press(Message::ClientSelect(MineClient::LegacyLauncher));
 
+            let silent_client = button("Silent Client").on_press(Message::ClientSelect(MineClient::Silent));
+
             column![
                 welcome_text,
                 dafault_client_row,
                 badlion,
                 lunar,
-                legacy_launcher
+                legacy_launcher,
+                silent_client
             ]
             .spacing(10)
             .padding(10)

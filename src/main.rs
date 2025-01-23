@@ -119,6 +119,7 @@ impl KCOverlay {
             2 => MineClient::Lunar,
             3 => MineClient::LegacyLauncher,
             4 => MineClient::Custom(custom_client_path),
+            5 => MineClient::Silent,
             _ => MineClient::Default,
         };
 
@@ -229,6 +230,7 @@ impl KCOverlay {
                         }
                         4
                     }
+                    MineClient::Silent => 5,
                 };
 
                 config["client"] = serde_json::json!(client_number);
@@ -401,6 +403,7 @@ fn read_command() -> impl Stream<Item = LogReader> {
             MineClient::Lunar => util::lunar_get_newer_logs_path(),
             MineClient::LegacyLauncher => util::get_legacy_launcher_dir(),
             MineClient::Custom(path) => path,
+            MineClient::Silent => format!("{}/silentclient/logs/main.log", util::get_home_dir()),
         };
 
         let mut file = File::open(&logs_path);
@@ -421,6 +424,7 @@ fn read_command() -> impl Stream<Item = LogReader> {
                                 MineClient::Lunar => util::lunar_get_newer_logs_path(),
                                 MineClient::LegacyLauncher => util::get_legacy_launcher_dir(),
                                 MineClient::Custom(path) => path,
+                                MineClient::Silent => format!("{}/silentclient/logs/main.log", util::get_home_dir()),
                             };
 
                             match File::open(&logs_path) {
@@ -472,6 +476,7 @@ fn read_command() -> impl Stream<Item = LogReader> {
                         MineClient::Lunar => util::lunar_get_newer_logs_path(),
                         MineClient::LegacyLauncher => util::get_legacy_launcher_dir(),
                         MineClient::Custom(path) => path,
+                        MineClient::Silent => format!("{}/silentclient/logs/main.log", util::get_home_dir()),
                     };
 
                     let file = match File::open(&logs_path) {
@@ -718,6 +723,7 @@ enum MineClient {
     Lunar,
     LegacyLauncher,
     Custom(String),
+    Silent
 }
 
 impl Display for MineClient {
@@ -728,6 +734,7 @@ impl Display for MineClient {
             MineClient::Lunar => write!(f, "Lunar"),
             MineClient::LegacyLauncher => write!(f, "Legacy Launcher"),
             MineClient::Custom(_) => write!(f, "Personalizado"),
+            MineClient::Silent => write!(f, "Silent Client"),
         }
     }
 }
