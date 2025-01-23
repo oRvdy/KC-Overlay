@@ -20,6 +20,7 @@ Até o momento, os seguintes clients e launchers são suportados:
 * CMClient (Com o Launcher do CMClient não funciona, é necessário usar o CMClient com outro launcher, como o launcher oficial ou o tlauncher)
 * Badlion
 * Lunar
+* Silent Client
 * Legacy Launcher
 
 Caso queira que seja adicionado suporte para outro launcher ou client, solicite no Discord.
