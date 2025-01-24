@@ -1,9 +1,7 @@
 // Aqui está todo a interface do KC Overlay, o design e as mensagens produzidas por cada widget.
 
 use iced::{
-    theme,
-    widget::{column, container, row, text, Column},
-    Color, Font, Renderer,
+    theme, widget::{column, container, row, text, Column}, Alignment, Color, Font, Renderer
 };
 
 use crate::{
@@ -43,9 +41,9 @@ pub fn get_screen(
             let bar = row![screen_title_widget];
 
             let mut username_column = Column::new().width(300);
-            let mut winstreak_column = Column::new();
-            let mut winrate_column = Column::new();
-            let mut fkdr_column = Column::new();
+            let mut winstreak_column = Column::new().align_x(Alignment::Center);
+            let mut winrate_column = Column::new().align_x(Alignment::Center);
+            let mut fkdr_column = Column::new().align_x(Alignment::Center);
 
             let players = app.players.clone();
 
