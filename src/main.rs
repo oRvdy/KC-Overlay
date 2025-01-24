@@ -81,6 +81,7 @@ struct KCOverlay {
     player_getter_sender: Option<mpsc::Sender<()>>,
     update: Update,
     never_minimize: bool,
+    seconds_to_minimize: u64
 }
 
 #[derive(Debug, Clone)]
@@ -101,6 +102,7 @@ enum Message {
     CustomClientPathModified(String),
     SearchExplorer,
     ChangeNeverMinimize(bool),
+    ChangeSecondsToMinimize(f64)
 }
 
 impl KCOverlay {
@@ -125,6 +127,7 @@ impl KCOverlay {
             _ => MineClient::Default,
         };
         let never_minimize = config["never_minimize"].as_bool().unwrap_or(false);
+        let seconds_to_minimize = config["seconds_to_minimize"].as_u64().unwrap_or(10);
 
         let screen = if is_first_use {
             Screen::Welcome
@@ -142,6 +145,7 @@ impl KCOverlay {
                 player_getter_sender: None,
                 update: Update::empty(),
                 never_minimize,
+                seconds_to_minimize
             },
             Task::batch(vec![Task::perform(
                 update::check_updates(),
@@ -201,8 +205,6 @@ impl KCOverlay {
                 if self.loading {
                     Task::none()
                 } else {
-                    self.players.clear();
-
                     if self.never_minimize {
                         Task::none()
                     } else {
@@ -281,7 +283,7 @@ impl KCOverlay {
                 PlayerSender::Done => {
                     self.loading = false;
                     self.player_getter_sender = None;
-                    Task::perform(util::wait(Duration::from_secs(10)), |_| {
+                    Task::perform(util::wait(Duration::from_secs(self.seconds_to_minimize)), |_| {
                         Message::ChangeLevel
                     })
                 }
@@ -369,9 +371,15 @@ impl KCOverlay {
             }
             Message::ChangeNeverMinimize(bool) => {
                 self.never_minimize = bool;
-                config::save_settings(Some(bool));
+                config::save_settings(Some(bool), None);
                 Task::none()
             }
+            Message::ChangeSecondsToMinimize(f_seconds) => {
+                let u_seconds = f_seconds as u64;
+                self.seconds_to_minimize = u_seconds;
+                config::save_settings(None, Some(u_seconds));
+                Task::none()
+            },
         }
     }
 

@@ -48,6 +48,12 @@ pub fn check_config_file() -> bool {
                 serde_json::to_value(false).unwrap(),
             );
         }
+        if !map.contains_key("seconds_to_minimize") {
+            map.insert(
+                "seconds_to_minimize".to_owned(),
+                serde_json::to_value(12).unwrap(),
+            );
+        }
     }
 
     let serializedjson = serde_json::to_string_pretty(&conf_json).unwrap();
@@ -57,11 +63,14 @@ pub fn check_config_file() -> bool {
     !file_exists
 }
 
-pub fn save_settings(never_minimize: Option<bool>) {
+pub fn save_settings(never_minimize: Option<bool>, seconds_to_minimize: Option<u64>) {
     let mut config = get_config();
 
     if let Some(never_minimize_option) = never_minimize {
         config["never_minimize"] = serde_json::json!(never_minimize_option)
+    }
+    if let Some(seconds) = seconds_to_minimize{
+        config["seconds_to_minimize"] = serde_json::json!(seconds)
     }
 
     let mut config_file = OpenOptions::new()

@@ -5,7 +5,7 @@ use iced::{
 };
 
 use crate::{
-    themed_widgets::{button, pick_list, secondary_button, text_input, toggler},
+    themed_widgets::{button, pick_list, secondary_button, slider, text_input, toggler},
     Message, MineClient,
 };
 
@@ -141,15 +141,24 @@ pub fn get_screen(
 
                 main_column = main_column
                     .push(column![custom_client_text, custom_client_row])
-                    .spacing(10)
+                    .spacing(20)
             }
 
             let never_minimize_toggler =
                 toggler(app.never_minimize).on_toggle(Message::ChangeNeverMinimize).size(20);
+
             let never_minimize_text = text("Nunca minimizar automaticamente");
             let never_minimize_row = row![never_minimize_toggler, never_minimize_text].spacing(10);
 
             main_column = main_column.push(never_minimize_row);
+
+            let seconds_to_minimize_text = text(format!("Duração da janela depois de carregar os jogadores: {}", app.seconds_to_minimize));
+            let seconds_to_minimize_slider = slider(5.0..=120., app.seconds_to_minimize as f64, Message::ChangeSecondsToMinimize).width(240);
+            let seconds_to_minimize_column = column![seconds_to_minimize_text, seconds_to_minimize_slider].spacing(5);
+            
+            if !app.never_minimize{
+                main_column = main_column.push(seconds_to_minimize_column)
+            }
 
             column![main_column, go_back].padding(10).spacing(10)
         }
