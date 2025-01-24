@@ -35,6 +35,7 @@ mod update;
 mod util;
 
 fn main() {
+    // Isso é o processo final do update. Remove o executável antigo, caso exista.
     let old_exec = env::current_exe().unwrap().with_extension("old");
     if Path::new(&old_exec).exists() {
         match fs::remove_file(old_exec) {
@@ -45,6 +46,7 @@ fn main() {
 
     let icon = include_bytes!("../assets/icon.png");
 
+    // Executa a lógica do programa.
     iced::application(KCOverlay::title, KCOverlay::update, KCOverlay::view)
         .subscription(KCOverlay::subscription)
         .resizable(false)
@@ -71,6 +73,7 @@ fn main() {
         .unwrap();
 }
 
+// Estrutura do programa, aqui estão salvas todas as variáveis necessárias.
 #[derive(Default)]
 struct KCOverlay {
     screen: Screen,
@@ -84,6 +87,7 @@ struct KCOverlay {
     seconds_to_minimize: u64
 }
 
+// Mensagens enviadas para o programa saber quando atualizar variáveis, executar funções, e etc.
 #[derive(Debug, Clone)]
 enum Message {
     ChangeScreen(Screen),
@@ -105,10 +109,13 @@ enum Message {
     ChangeSecondsToMinimize(f64)
 }
 
+// Lógica principal do programa.
 impl KCOverlay {
+    // Fontes :D
     const FONT: &'static [u8] = include_bytes!("../fonts/Manrope-Regular.ttf");
     const SYMBOL_FONT: &'static [u8] = include_bytes!("../fonts/NotoSansSymbols2-Regular.ttf");
 
+    // Função executada após o início da lógica. Ela coleta os dados do arquivo de configuração.
     fn new() -> (Self, Task<Message>) {
         let is_first_use = config::check_config_file();
 
@@ -158,6 +165,7 @@ impl KCOverlay {
         format!("KC Overlay {}", env!("CARGO_PKG_VERSION"))
     }
 
+    // Qualquer mensagem passará por esta função, executando sua respectiva ação.
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::ChangeScreen(screen) => {
@@ -167,6 +175,7 @@ impl KCOverlay {
 
             Message::Log(log_reader) => match log_reader {
                 LogReader::Log(message) => {
+                    // Checa se a mensagem possui a lista de jogadores de quando o jogador digita "/jogando".
                     if message.contains("[CHAT] Jogadores") {
                         let split = message.split("):").map(|x| x.to_string());
                         let split_vector: Vec<String> = split.clone().collect();
@@ -201,6 +210,7 @@ impl KCOverlay {
                     Task::future(async move { sender.send(client).await.unwrap() }).discard()
                 }
             },
+            // Minimiza a janela
             Message::ChangeLevel => {
                 if self.loading {
                     Task::none()
@@ -214,6 +224,7 @@ impl KCOverlay {
                     }
                 }
             }
+            // Arrasta a janela quando o botão do mouse está segurado.
             Message::GotEvent(event) => match event {
                 iced::Event::Mouse(iced::mouse::Event::ButtonPressed(Button::Left)) => {
                     window::get_latest().and_then(window::drag)
@@ -221,6 +232,7 @@ impl KCOverlay {
                 _ => Task::none(),
             },
             Message::Close => window::get_latest().and_then(window::close),
+            // Seleciona o Client e salva no arquivo de configuração.
             Message::ClientSelect(mine_client) => {
                 self.client = mine_client.clone();
 
@@ -266,12 +278,14 @@ impl KCOverlay {
                 }
             }
             Message::Minimize => window::get_latest().and_then(|x| window::minimize(x, true)),
+            // Avisa ao código responsável por ler os logs que o client foi atualizado e ele precisa ler os logs de outro lugar.
             Message::ClientUpdate => match &self.logs_sender {
                 Some(sender) => {
                     Task::future(update_client(sender.clone(), self.client.clone())).discard()
                 }
                 None => Task::none(),
             },
+            // Gerencia o output do código responsável por ler os logs.
             Message::PlayerSender(player_sender) => match player_sender {
                 PlayerSender::Player(player) => {
                     self.players.push(player);
@@ -300,6 +314,7 @@ impl KCOverlay {
                     Task::none()
                 }
             },
+            // Resultado da verificação de update.
             Message::CheckedUpdates(result) => {
                 match result {
                     Ok(url) => {
@@ -316,6 +331,7 @@ impl KCOverlay {
                 open::that(url).unwrap();
                 Task::none()
             }
+            // Começa a atualização
             Message::Update => {
                 self.update.available = false;
                 Task::perform(
@@ -323,6 +339,7 @@ impl KCOverlay {
                     Message::UpdateResult,
                 )
             }
+            // Resultado da atualização. Caso houver algum erro, a atualização não vai ser completada.
             Message::UpdateResult(result) => {
                 match result {
                     Ok(_) => {
@@ -383,19 +400,21 @@ impl KCOverlay {
         }
     }
 
+    // Interface
     fn view(&self) -> Element<Message> {
         screens::get_screen(self.screen, self).into()
     }
 
+    // Gerencia subscriptions. Basicamente código que é executado fora da lógica principal e que tem a capacidade de enviar mensagens. 
     fn subscription(&self) -> Subscription<Message> {
         let event = event::listen().map(Message::GotEvent);
-        let command_reader = Subscription::run(read_command).map(Message::Log);
+        let logs_reader = Subscription::run(logs_reader).map(Message::Log);
 
-        // In case the user opens the game after the overlay
+        // A cada 20 segundos atualiza o client do leitor de logs, caso tenha sido mudado.
         let client_updater =
             time::every(Duration::from_secs(20)).map(move |_| Message::ClientUpdate);
 
-        Subscription::batch(vec![event, command_reader, client_updater])
+        Subscription::batch(vec![event, logs_reader, client_updater])
     }
 
     fn scale_factor(&self) -> f64 {
@@ -403,32 +422,28 @@ impl KCOverlay {
     }
 }
 
+// Output do leitor de logs.
 #[derive(Debug, Clone)]
 enum LogReader {
     Log(String),
     Sender(mpsc::Sender<MineClient>),
 }
-// Read the game logs to get the player list when user types /jogando
-fn read_command() -> impl Stream<Item = LogReader> {
+// Leitor de logs. Envia toda linha dos logs para a lógica principal, com o objetivo de obter a lista de jogadores.
+fn logs_reader() -> impl Stream<Item = LogReader> {
     stream::channel(100, |mut output| async move {
+        // comunicação entre a lógica principal e esta stream.
         let (sender, mut receiver) = mpsc::channel(100);
-
         output.send(LogReader::Sender(sender)).await.unwrap();
 
         let client = receiver.select_next_some().await;
-        let minecraft_dir = util::get_minecraft_dir();
-
-        let logs_path = match client {
-            MineClient::Default => format!("{}/logs/latest.log", minecraft_dir),
-            MineClient::Badlion => format!("{}/logs/blclient/minecraft/latest.log", minecraft_dir),
-            MineClient::Lunar => util::lunar_get_newer_logs_path(),
-            MineClient::LegacyLauncher => util::get_legacy_launcher_dir(),
-            MineClient::Custom(path) => path,
-            MineClient::Silent => format!("{}/silentclient/logs/main.log", util::get_home_dir()),
-        };
-
+        let logs_path = get_logs_path(client);
         let mut file = File::open(&logs_path);
 
+        /*
+        * Se o arquivo de logs existir, tudo certo. Caso contrário, espera a lógica principal enviar um que exista.
+        * O usuário pode selecionar um client que ele não tenha instalado ou colocar um custom client que não exista,
+        * fazendo o programa procurar por um log inexistente.
+        */
         match file {
             Ok(ok) => {
                 file = Ok(ok);
@@ -437,18 +452,7 @@ fn read_command() -> impl Stream<Item = LogReader> {
                 while !Path::new(&logs_path).exists() {
                     match receiver.try_next() {
                         Ok(Some(message)) => {
-                            let logs_path = match message {
-                                MineClient::Default => format!("{}/logs/latest.log", minecraft_dir),
-                                MineClient::Badlion => {
-                                    format!("{}/logs/blclient/minecraft/latest.log", minecraft_dir)
-                                }
-                                MineClient::Lunar => util::lunar_get_newer_logs_path(),
-                                MineClient::LegacyLauncher => util::get_legacy_launcher_dir(),
-                                MineClient::Custom(path) => path,
-                                MineClient::Silent => {
-                                    format!("{}/silentclient/logs/main.log", util::get_home_dir())
-                                }
-                            };
+                            let logs_path = get_logs_path(message);
 
                             match File::open(&logs_path) {
                                 Ok(ok) => {
@@ -476,6 +480,7 @@ fn read_command() -> impl Stream<Item = LogReader> {
         let mut buffer = String::new();
         reader.seek(SeekFrom::End(0)).unwrap();
 
+        // Lê e envia pra lógica principal.
         loop {
             match reader.read_line(&mut buffer) {
                 Ok(0) => {
@@ -489,20 +494,10 @@ fn read_command() -> impl Stream<Item = LogReader> {
                 Err(e) => println!("Error at reading logs: {e}"),
             }
 
+            // Verifica se a lógica principal pediu para atualizar o client.
             match receiver.try_next() {
                 Ok(Some(message)) => {
-                    let logs_path = match message {
-                        MineClient::Default => format!("{}/logs/latest.log", minecraft_dir),
-                        MineClient::Badlion => {
-                            format!("{}/logs/blclient/minecraft/latest.log", minecraft_dir)
-                        }
-                        MineClient::Lunar => util::lunar_get_newer_logs_path(),
-                        MineClient::LegacyLauncher => util::get_legacy_launcher_dir(),
-                        MineClient::Custom(path) => path,
-                        MineClient::Silent => {
-                            format!("{}/silentclient/logs/main.log", util::get_home_dir())
-                        }
-                    };
+                    let logs_path = get_logs_path(message);
 
                     let file = match File::open(&logs_path) {
                         Ok(ok) => ok,
@@ -523,12 +518,32 @@ fn read_command() -> impl Stream<Item = LogReader> {
     })
 }
 
+fn get_logs_path(client: MineClient) -> String{
+    let minecraft_dir = util::get_minecraft_dir();
+
+    match client {
+        MineClient::Default => format!("{}/logs/latest.log", minecraft_dir),
+        MineClient::Badlion => {
+            format!("{}/logs/blclient/minecraft/latest.log", minecraft_dir)
+        }
+        MineClient::Lunar => util::lunar_get_newer_logs_path(),
+        MineClient::LegacyLauncher => util::get_legacy_launcher_dir(),
+        MineClient::Custom(path) => path,
+        MineClient::Silent => {
+            format!("{}/silentclient/logs/main.log", util::get_home_dir())
+        }
+    }
+}
+
+// Output do código responsável por obter os stats dos players.
 #[derive(Clone, Debug)]
 enum PlayerSender {
     Player(Player),
     Sender(mpsc::Sender<()>),
     Done,
 }
+
+// Pega os stats dos players da API do Mush.
 fn get_players(str_player_list: Vec<String>) -> impl Stream<Item = PlayerSender> {
     stream::channel(100, |mut output| async move {
         let (sender, mut receiver) = mpsc::channel(100);
@@ -616,7 +631,7 @@ fn get_players(str_player_list: Vec<String>) -> impl Stream<Item = PlayerSender>
 
                 let level_color = bedwars_stats["level_badge"]["hex_color"]
                     .as_str()
-                    .unwrap()
+                    .unwrap_or("#ffffff")
                     .to_string();
 
                 let winstreak = bedwars_stats["winstreak"].as_i64().unwrap_or(0);
@@ -643,11 +658,15 @@ fn get_players(str_player_list: Vec<String>) -> impl Stream<Item = PlayerSender>
                     .await
                     .unwrap();
             }
-            // Check for stop order
+            /*
+             * Verifica se a lógica principal quer parar a obtenção de stats.
+             * Isso acontece quando o jogador digita /jogando enquanto este código está sendo executado.
+            */ 
             if receiver.try_next().is_ok() {
                 interrupted = true;
                 break;
             }
+            // Espera 50 milissegundos antes de conseguir os stats do próximo player. Isso é pra não saturar a API do Mush.
             sleep(Duration::from_millis(50)).await;
         }
         if !interrupted {
@@ -660,6 +679,7 @@ async fn update_client(mut sender: Sender<MineClient>, client: MineClient) {
     sender.send(client).await.unwrap();
 }
 
+// Estrutura dos stats de um player
 #[derive(Debug, Clone)]
 struct Player {
     username: String,
@@ -676,6 +696,7 @@ struct Player {
     level_color: Rgb,
 }
 
+// Funções para construir uma estrutura de player
 impl Player {
     fn new(
         username: String,
@@ -740,6 +761,7 @@ impl Player {
     }
 }
 
+// Clients
 #[derive(Default, Clone, Debug, PartialEq)]
 enum MineClient {
     #[default]
@@ -751,6 +773,7 @@ enum MineClient {
     Silent,
 }
 
+// Clients em string.
 impl Display for MineClient {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -764,6 +787,7 @@ impl Display for MineClient {
     }
 }
 
+// Estrutura de um update.
 #[derive(Default)]
 struct Update {
     available: bool,

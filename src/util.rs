@@ -1,3 +1,5 @@
+// Código para funções essenciais
+
 use std::{
     fs::{self, File},
     io::Read,
@@ -37,9 +39,8 @@ pub fn get_legacy_launcher_dir() -> String {
     }
 }
 
-pub async fn wait(time: Duration) -> bool {
+pub async fn wait(time: Duration){
     sleep(time).await;
-    true
 }
 
 pub fn get_json(jpathstring: String) -> Value {

@@ -1,3 +1,5 @@
+// Aqui está todo a interface do KC Overlay, o design e as mensagens produzidas por cada widget.
+
 use iced::{
     theme,
     widget::{column, container, row, text, Column},
@@ -152,7 +154,7 @@ pub fn get_screen(
 
             main_column = main_column.push(never_minimize_row);
 
-            let seconds_to_minimize_text = text(format!("Duração da janela depois de carregar os jogadores: {}", app.seconds_to_minimize));
+            let seconds_to_minimize_text = text(format!("Mostrar o KC Overlay por {} segundos após carregar os jogadores", app.seconds_to_minimize));
             let seconds_to_minimize_slider = slider(5.0..=120., app.seconds_to_minimize as f64, Message::ChangeSecondsToMinimize).width(240);
             let seconds_to_minimize_column = column![seconds_to_minimize_text, seconds_to_minimize_slider].spacing(5);
             
