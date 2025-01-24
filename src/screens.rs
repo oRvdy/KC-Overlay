@@ -22,7 +22,7 @@ pub fn get_screen(
     screen: Screen,
     app: &super::KCOverlay,
 ) -> Column<'static, super::Message, theme::Theme, Renderer> {
-    const COLUMN_HEIGHT: u16 = 375;
+    const COLUMN_HEIGHT: u16 = 390;
 
     match screen {
         Screen::Main => {

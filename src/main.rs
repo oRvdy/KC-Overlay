@@ -53,7 +53,7 @@ fn main() {
         .decorations(false)
         .transparent(true)
         .window(Settings {
-            size: Size::new(640., 440.),
+            size: Size::new(640., 460.),
             position: Position::Specific(Point::new(0., 50.)),
             resizable: false,
             decorations: false,
@@ -666,7 +666,7 @@ fn get_players(str_player_list: Vec<String>) -> impl Stream<Item = PlayerSender>
                 interrupted = true;
                 break;
             }
-            // Espera 50 milissegundos antes de conseguir os stats do próximo player. Isso é pra não saturar a API do Mush.
+            // Espera um tempo antes de conseguir os stats do próximo player. Isso é pra não saturar a API do Mush.
             sleep(Duration::from_millis(50)).await;
         }
         if !interrupted {
