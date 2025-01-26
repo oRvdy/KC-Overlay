@@ -278,7 +278,7 @@ impl KCOverlay {
                 }
             }
             Message::Minimize => window::get_latest().and_then(|x| window::minimize(x, true)),
-            // Avisa ao código responsável por ler os logs que o client foi atualizado e ele precisa ler os logs de outro lugar.
+            // Ordena o código responsável por ler os logs para ler os logs de outro client.
             Message::ClientUpdate => match &self.logs_sender {
                 Some(sender) => {
                     Task::future(update_client(sender.clone(), self.client.clone())).discard()
