@@ -1,3 +1,5 @@
+![icon](https://github.com/user-attachments/assets/78f663a3-8f36-4f53-a63c-b362259c6489)
+
 # KC Overlay
 
 Este programa é um simples overlay para visualizar os stats dos jogadores no Mush. Ele mostra o level, winstreak, taxa de vitória e o fkdr de todos os jogadores presentes na sala. Além disso, também avisa se há jogadores usando /nick ou possíveis cheaters.
