@@ -80,8 +80,8 @@ pub fn get_screen(
 
                 let username_widget = text(player.username).color(player.username_color.to_color());
                 let clan_widget = text(clan).color(player.clan_color.to_color());
-                let (winstreak_widget, winrate_widget, fkdr, kdr) = if player.is_nicked || player.is_possible_cheater{
-                    (text(""), text(""), text(""), text(""))
+                let (winstreak_widget, winrate_widget, fkdr, kdr) = if player.is_nicked{
+                    (text("?"), text("?"), text("?"), text("?"))
                 }else {
                     (text(format!("{}", player.winstreak)), text(format!("{:.2}", player.winrate)), text(format!("{:.2}", player.final_kill_final_death_ratio)), text(format!("{:.2}", player.kill_death_ratio)))
                 }; 

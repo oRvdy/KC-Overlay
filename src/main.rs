@@ -589,17 +589,11 @@ fn get_players(str_player_list: Vec<String>) -> impl Stream<Item = PlayerSender>
             }
             let response = json["response"].clone();
 
-            if response["last_login"].as_i64().unwrap() - response["first_login"].as_i64().unwrap()
+            let is_possible_cheater = if response["last_login"].as_i64().unwrap() - response["first_login"].as_i64().unwrap()
                 < 7200000
             {
-                output
-                    .send(PlayerSender::Player(Player::new_possible_cheater(
-                        i.to_string(),
-                    )))
-                    .await
-                    .unwrap();
-                continue;
-            }
+                true
+            } else{ false};
 
             let username_color = response["rank_tag"]["color"].as_str().unwrap();
             let (clan, clan_color) = if response["clan"].is_object() {
@@ -613,7 +607,7 @@ fn get_players(str_player_list: Vec<String>) -> impl Stream<Item = PlayerSender>
 
             let bedwars_stats = response["stats"]["bedwars"].clone();
             if bedwars_stats.is_object() {
-                let level = bedwars_stats["level"].as_i64().unwrap_or(0);
+                let level = if !is_possible_cheater{bedwars_stats["level"].as_i64().unwrap_or(0)} else {998};
                 let level_symbol_raw: String = bedwars_stats["level_badge"]["format"]
                     .as_str()
                     .unwrap()
@@ -633,13 +627,23 @@ fn get_players(str_player_list: Vec<String>) -> impl Stream<Item = PlayerSender>
 
                 let winstreak = bedwars_stats["winstreak"].as_i64().unwrap_or(0);
 
-                let winrate = bedwars_stats["wins"].as_i64().unwrap_or(0) as f32
+                let mut winrate = bedwars_stats["wins"].as_i64().unwrap_or(0) as f32
                     / bedwars_stats["losses"].as_i64().unwrap_or(0) as f32;
-                let final_kill_final_death_ratio =
+                let mut final_kill_final_death_ratio =
                     bedwars_stats["final_kills"].as_i64().unwrap_or(0) as f32
                         / bedwars_stats["final_deaths"].as_i64().unwrap_or(0) as f32;
 
-                let kill_death_ratio = bedwars_stats["kills"].as_i64().unwrap_or(0) as f32 / bedwars_stats["deaths"].as_i64().unwrap_or(0) as f32;
+                let mut kill_death_ratio = bedwars_stats["kills"].as_i64().unwrap_or(0) as f32 / bedwars_stats["deaths"].as_i64().unwrap_or(0) as f32;
+                
+                if winrate.is_nan(){
+                    winrate = 0.0;
+                }
+                if final_kill_final_death_ratio.is_nan(){
+                    final_kill_final_death_ratio = 0.0;
+                }
+                if kill_death_ratio.is_nan(){
+                    kill_death_ratio = 0.0;
+                }
 
                 output
                     .send(PlayerSender::Player(Player::new(
@@ -650,6 +654,7 @@ fn get_players(str_player_list: Vec<String>) -> impl Stream<Item = PlayerSender>
                         winstreak as i32,
                         clan,
                         Rgb::from_hex(clan_color),
+                        is_possible_cheater,
                         winrate,
                         final_kill_final_death_ratio,
                         kill_death_ratio,
@@ -707,6 +712,7 @@ impl Player {
         winstreak: i32,
         clan: Option<String>,
         clan_color: Rgb,
+        is_possible_cheater: bool,
         winrate: f32,
         final_kill_final_death_ratio: f32,
         kill_death_ratio: f32,
@@ -721,7 +727,7 @@ impl Player {
             clan,
             clan_color,
             is_nicked: false,
-            is_possible_cheater: false,
+            is_possible_cheater,
             winrate,
             final_kill_final_death_ratio,
             kill_death_ratio,
@@ -740,24 +746,6 @@ impl Player {
             clan_color: Rgb::new(0, 0, 0),
             is_nicked: true,
             is_possible_cheater: false,
-            winrate: 0.,
-            final_kill_final_death_ratio: 0.,
-            kill_death_ratio: 0.,
-            level_color: Rgb::new(0, 255, 255),
-        }
-    }
-
-    fn new_possible_cheater(username: String) -> Self {
-        Player {
-            username,
-            username_color: Rgb::new(255, 0, 0),
-            level: 999,
-            level_symbol: "?".to_string(),
-            winstreak: 0,
-            clan: None,
-            clan_color: Rgb::new(0, 0, 0),
-            is_nicked: false,
-            is_possible_cheater: true,
             winrate: 0.,
             final_kill_final_death_ratio: 0.,
             kill_death_ratio: 0.,
