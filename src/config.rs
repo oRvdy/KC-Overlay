@@ -55,7 +55,10 @@ pub fn check_config_file() -> bool {
             );
         }
         if !map.contains_key("remove_eliminated_players") {
-            map.insert("remove_eliminated_players".to_owned(), serde_json::to_value(true).unwrap());
+            map.insert(
+                "remove_eliminated_players".to_owned(),
+                serde_json::to_value(true).unwrap(),
+            );
         }
     }
 
@@ -66,16 +69,20 @@ pub fn check_config_file() -> bool {
     !file_exists
 }
 
-pub fn save_settings(never_minimize: Option<bool>, seconds_to_minimize: Option<u64>, remove_eliminated_players: Option<bool>) {
+pub fn save_settings(
+    never_minimize: Option<bool>,
+    seconds_to_minimize: Option<u64>,
+    remove_eliminated_players: Option<bool>,
+) {
     let mut config = get_config();
 
     if let Some(never_minimize_option) = never_minimize {
         config["never_minimize"] = serde_json::json!(never_minimize_option)
     }
-    if let Some(seconds) = seconds_to_minimize{
+    if let Some(seconds) = seconds_to_minimize {
         config["seconds_to_minimize"] = serde_json::json!(seconds)
     }
-    if let Some(remove_eliminated_players_option) = remove_eliminated_players{
+    if let Some(remove_eliminated_players_option) = remove_eliminated_players {
         config["remove_eliminated_players"] = serde_json::json!(remove_eliminated_players_option)
     }
 

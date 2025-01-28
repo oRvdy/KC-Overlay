@@ -85,7 +85,7 @@ struct KCOverlay {
     update: Update,
     never_minimize: bool,
     seconds_to_minimize: u64,
-    remove_eliminated_players: bool
+    remove_eliminated_players: bool,
 }
 
 // Mensagens enviadas para o programa saber quando atualizar variáveis, executar funções, e etc.
@@ -108,7 +108,7 @@ enum Message {
     SearchExplorer,
     ChangeNeverMinimize(bool),
     ChangeSecondsToMinimize(f64),
-    ChangeRemoveEliminatedPlayers(bool)
+    ChangeRemoveEliminatedPlayers(bool),
 }
 
 // Lógica principal do programa.
@@ -137,7 +137,9 @@ impl KCOverlay {
         };
         let never_minimize = config["never_minimize"].as_bool().unwrap_or(false);
         let seconds_to_minimize = config["seconds_to_minimize"].as_u64().unwrap_or(10);
-        let remove_eliminated_players = config["remove_eliminated_players"].as_bool().unwrap_or(true);
+        let remove_eliminated_players = config["remove_eliminated_players"]
+            .as_bool()
+            .unwrap_or(true);
 
         let screen = if is_first_use {
             Screen::Welcome
@@ -156,7 +158,7 @@ impl KCOverlay {
                 update: Update::empty(),
                 never_minimize,
                 seconds_to_minimize,
-                remove_eliminated_players
+                remove_eliminated_players,
             },
             Task::batch(vec![Task::perform(
                 update::check_updates(),
@@ -180,9 +182,11 @@ impl KCOverlay {
             Message::Log(log_reader) => match log_reader {
                 LogReader::Log(message) => {
                     // Checa se algum jogador que está na lista foi eliminado da partida.
-                    if message.contains("KILL FINAL"){
-                        for (index, player) in self.players.clone().iter().enumerate(){
-                            if message.contains(&format!("{} morreu", player.username)) && self.remove_eliminated_players{
+                    if message.contains("KILL FINAL") {
+                        for (index, player) in self.players.clone().iter().enumerate() {
+                            if message.contains(&format!("{} morreu", player.username))
+                                && self.remove_eliminated_players
+                            {
                                 self.players.remove(index);
                             }
                         }
@@ -309,9 +313,10 @@ impl KCOverlay {
                 PlayerSender::Done => {
                     self.loading = false;
                     self.player_getter_sender = None;
-                    Task::perform(util::wait(Duration::from_secs(self.seconds_to_minimize)), |_| {
-                        Message::ChangeLevel
-                    })
+                    Task::perform(
+                        util::wait(Duration::from_secs(self.seconds_to_minimize)),
+                        |_| Message::ChangeLevel,
+                    )
                 }
                 PlayerSender::Sender(new_sender) => {
                     match self.player_getter_sender.clone() {
@@ -408,12 +413,12 @@ impl KCOverlay {
                 self.seconds_to_minimize = u_seconds;
                 config::save_settings(None, Some(u_seconds), None);
                 Task::none()
-            },
+            }
             Message::ChangeRemoveEliminatedPlayers(bool) => {
                 self.remove_eliminated_players = bool;
                 config::save_settings(None, None, Some(bool));
                 Task::none()
-            },
+            }
         }
     }
 
@@ -422,7 +427,7 @@ impl KCOverlay {
         screens::get_screen(self.screen, self).into()
     }
 
-    // Gerencia subscriptions. Basicamente código que é executado fora da lógica principal e que tem a capacidade de enviar mensagens. 
+    // Gerencia subscriptions. Basicamente código que é executado fora da lógica principal e que tem a capacidade de enviar mensagens.
     fn subscription(&self) -> Subscription<Message> {
         let event = event::listen().map(Message::GotEvent);
         let logs_reader = Subscription::run(logs_reader).map(Message::Log);
@@ -457,10 +462,10 @@ fn logs_reader() -> impl Stream<Item = LogReader> {
         let mut file = File::open(&logs_path);
 
         /*
-        * Se o arquivo de logs existir, tudo certo. Caso contrário, espera a lógica principal enviar um que exista.
-        * O usuário pode selecionar um client que ele não tenha instalado ou colocar um custom client que não exista,
-        * fazendo o programa procurar por um log inexistente.
-        */
+         * Se o arquivo de logs existir, tudo certo. Caso contrário, espera a lógica principal enviar um que exista.
+         * O usuário pode selecionar um client que ele não tenha instalado ou colocar um custom client que não exista,
+         * fazendo o programa procurar por um log inexistente.
+         */
         match file {
             Ok(ok) => {
                 file = Ok(ok);
@@ -535,7 +540,7 @@ fn logs_reader() -> impl Stream<Item = LogReader> {
     })
 }
 
-fn get_logs_path(client: MineClient) -> String{
+fn get_logs_path(client: MineClient) -> String {
     let minecraft_dir = util::get_minecraft_dir();
 
     match client {
@@ -606,11 +611,14 @@ fn get_players(str_player_list: Vec<String>) -> impl Stream<Item = PlayerSender>
             }
             let response = json["response"].clone();
 
-            let is_possible_cheater = if response["last_login"].as_i64().unwrap() - response["first_login"].as_i64().unwrap()
+            let is_possible_cheater = if response["last_login"].as_i64().unwrap()
+                - response["first_login"].as_i64().unwrap()
                 < 7200000
             {
                 true
-            } else{ false};
+            } else {
+                false
+            };
 
             let username_color = response["rank_tag"]["color"].as_str().unwrap();
             let (clan, clan_color) = if response["clan"].is_object() {
@@ -624,7 +632,11 @@ fn get_players(str_player_list: Vec<String>) -> impl Stream<Item = PlayerSender>
 
             let bedwars_stats = response["stats"]["bedwars"].clone();
             if bedwars_stats.is_object() {
-                let level = if !is_possible_cheater{bedwars_stats["level"].as_i64().unwrap_or(0)} else {998};
+                let level = if !is_possible_cheater {
+                    bedwars_stats["level"].as_i64().unwrap_or(0)
+                } else {
+                    998
+                };
                 let level_symbol_raw: String = bedwars_stats["level_badge"]["format"]
                     .as_str()
                     .unwrap()
@@ -650,15 +662,16 @@ fn get_players(str_player_list: Vec<String>) -> impl Stream<Item = PlayerSender>
                     bedwars_stats["final_kills"].as_i64().unwrap_or(0) as f32
                         / bedwars_stats["final_deaths"].as_i64().unwrap_or(0) as f32;
 
-                let mut kill_death_ratio = bedwars_stats["kills"].as_i64().unwrap_or(0) as f32 / bedwars_stats["deaths"].as_i64().unwrap_or(0) as f32;
-                
-                if winrate.is_nan(){
+                let mut kill_death_ratio = bedwars_stats["kills"].as_i64().unwrap_or(0) as f32
+                    / bedwars_stats["deaths"].as_i64().unwrap_or(0) as f32;
+
+                if winrate.is_nan() {
                     winrate = 0.0;
                 }
-                if final_kill_final_death_ratio.is_nan(){
+                if final_kill_final_death_ratio.is_nan() {
                     final_kill_final_death_ratio = 0.0;
                 }
-                if kill_death_ratio.is_nan(){
+                if kill_death_ratio.is_nan() {
                     kill_death_ratio = 0.0;
                 }
 
@@ -683,7 +696,7 @@ fn get_players(str_player_list: Vec<String>) -> impl Stream<Item = PlayerSender>
             /*
              * Verifica se a lógica principal quer parar a obtenção de stats.
              * Isso acontece quando o jogador digita /jogando enquanto este código está sendo executado.
-            */ 
+             */
             if receiver.try_next().is_ok() {
                 interrupted = true;
                 break;

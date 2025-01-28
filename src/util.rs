@@ -39,7 +39,7 @@ pub fn get_legacy_launcher_dir() -> String {
     }
 }
 
-pub async fn wait(time: Duration){
+pub async fn wait(time: Duration) {
     sleep(time).await;
 }
 
@@ -108,25 +108,93 @@ impl Rgb {
         Rgb { red, green, blue }
     }
 
-    pub fn from_minecraft_color(color_char: &char) -> Self{
-        match color_char{
-            '0' => Rgb { red: 0, green: 0, blue: 0 },
-            '1' => Rgb { red: 0, green: 0, blue: 170 },
-            '2' => Rgb {red: 0, green: 170, blue: 0},
-            '3' => Rgb {red: 0, green: 170, blue: 170},
-            '4' => Rgb {red: 170, green: 0, blue: 0},
-            '5' => Rgb {red: 170, green: 0, blue: 170},
-            '6' => Rgb {red: 255, green: 170, blue: 0},
-            '7' => Rgb {red: 170, green: 170, blue: 170},
-            '8' => Rgb {red: 85, green: 85, blue: 85},
-            '9' => Rgb {red: 85, green: 85, blue: 255},
-            'a' => Rgb {red: 85, green: 255, blue: 85},
-            'b' => Rgb {red: 85, green: 255, blue: 255},
-            'c' => Rgb {red: 255, green: 85, blue: 85},
-            'd' => Rgb {red: 255, green: 85, blue: 255},
-            'e' => Rgb {red: 255, green: 255, blue: 85},
-            'f' => Rgb {red: 255, green: 255, blue: 255},
-            _ => Rgb { red: 255, green: 255, blue: 255 }
+    pub fn from_minecraft_color(color_char: &char) -> Self {
+        match color_char {
+            '0' => Rgb {
+                red: 0,
+                green: 0,
+                blue: 0,
+            },
+            '1' => Rgb {
+                red: 0,
+                green: 0,
+                blue: 170,
+            },
+            '2' => Rgb {
+                red: 0,
+                green: 170,
+                blue: 0,
+            },
+            '3' => Rgb {
+                red: 0,
+                green: 170,
+                blue: 170,
+            },
+            '4' => Rgb {
+                red: 170,
+                green: 0,
+                blue: 0,
+            },
+            '5' => Rgb {
+                red: 170,
+                green: 0,
+                blue: 170,
+            },
+            '6' => Rgb {
+                red: 255,
+                green: 170,
+                blue: 0,
+            },
+            '7' => Rgb {
+                red: 170,
+                green: 170,
+                blue: 170,
+            },
+            '8' => Rgb {
+                red: 85,
+                green: 85,
+                blue: 85,
+            },
+            '9' => Rgb {
+                red: 85,
+                green: 85,
+                blue: 255,
+            },
+            'a' => Rgb {
+                red: 85,
+                green: 255,
+                blue: 85,
+            },
+            'b' => Rgb {
+                red: 85,
+                green: 255,
+                blue: 255,
+            },
+            'c' => Rgb {
+                red: 255,
+                green: 85,
+                blue: 85,
+            },
+            'd' => Rgb {
+                red: 255,
+                green: 85,
+                blue: 255,
+            },
+            'e' => Rgb {
+                red: 255,
+                green: 255,
+                blue: 85,
+            },
+            'f' => Rgb {
+                red: 255,
+                green: 255,
+                blue: 255,
+            },
+            _ => Rgb {
+                red: 255,
+                green: 255,
+                blue: 255,
+            },
         }
     }
 

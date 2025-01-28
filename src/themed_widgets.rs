@@ -2,7 +2,10 @@ use std::{borrow::Borrow, ops::RangeInclusive};
 
 use iced::{
     border::Radius,
-    widget::{slider::{Handle, HandleShape, Rail}, PickList, TextInput},
+    widget::{
+        slider::{Handle, HandleShape, Rail},
+        PickList, TextInput,
+    },
     Background, Border, Color, Renderer, Shadow, Theme,
 };
 
@@ -126,19 +129,33 @@ pub fn toggler<'a>(is_checked: bool) -> iced::widget::Toggler<'a, Message, Theme
     })
 }
 
-pub fn slider<'a, T, Message>(range: RangeInclusive<T>, value: T, on_change: impl Fn(T) -> Message + 'a) -> iced::widget::Slider<'a, T, Message, Theme>
+pub fn slider<'a, T, Message>(
+    range: RangeInclusive<T>,
+    value: T,
+    on_change: impl Fn(T) -> Message + 'a,
+) -> iced::widget::Slider<'a, T, Message, Theme>
 where
     T: Copy + From<u8> + std::cmp::PartialOrd,
     Message: Clone,
-    {
-    iced::widget::slider(range, value, on_change).style(|_, _| iced::widget::slider::Style{
-        rail: Rail{
-            backgrounds: (Background::Color(Colors::ButtonColor.get()), Background::Color(Colors::WidgetBackground.get())),
+{
+    iced::widget::slider(range, value, on_change).style(|_, _| iced::widget::slider::Style {
+        rail: Rail {
+            backgrounds: (
+                Background::Color(Colors::ButtonColor.get()),
+                Background::Color(Colors::WidgetBackground.get()),
+            ),
             width: 5.,
-            border: Border { color: Colors::TextColor.get(), width: 0., radius: Radius::new(10) },
+            border: Border {
+                color: Colors::TextColor.get(),
+                width: 0.,
+                radius: Radius::new(10),
+            },
         },
-        handle: Handle{
-            shape: HandleShape::Rectangle { width: 10, border_radius: Radius::new(10.) },
+        handle: Handle {
+            shape: HandleShape::Rectangle {
+                width: 10,
+                border_radius: Radius::new(10.),
+            },
             background: Background::Color(Colors::ButtonColor.get()),
             border_width: 0.,
             border_color: Colors::ButtonColor.get(),

@@ -1,7 +1,9 @@
 // Aqui está todo a interface do KC Overlay, o design e as mensagens produzidas por cada widget.
 
 use iced::{
-    theme, widget::{column, container, row, text, Column}, Alignment, Color, Font, Renderer
+    theme,
+    widget::{column, container, row, text, Column},
+    Alignment, Color, Font, Renderer,
 };
 
 use crate::{
@@ -80,11 +82,16 @@ pub fn get_screen(
 
                 let username_widget = text(player.username).color(player.username_color.to_color());
                 let clan_widget = text(clan).color(player.clan_color.to_color());
-                let (winstreak_widget, winrate_widget, fkdr, kdr) = if player.is_nicked{
+                let (winstreak_widget, winrate_widget, fkdr, kdr) = if player.is_nicked {
                     (text("?"), text("?"), text("?"), text("?"))
-                }else {
-                    (text(format!("{}", player.winstreak)), text(format!("{:.2}", player.winrate)), text(format!("{:.2}", player.final_kill_final_death_ratio)), text(format!("{:.2}", player.kill_death_ratio)))
-                }; 
+                } else {
+                    (
+                        text(format!("{}", player.winstreak)),
+                        text(format!("{:.2}", player.winrate)),
+                        text(format!("{:.2}", player.final_kill_final_death_ratio)),
+                        text(format!("{:.2}", player.kill_death_ratio)),
+                    )
+                };
 
                 let username_row = row![level_widget, username_widget, clan_widget].spacing(5);
 
@@ -150,25 +157,42 @@ pub fn get_screen(
                     .spacing(20)
             }
 
-            let never_minimize_toggler =
-                toggler(app.never_minimize).on_toggle(Message::ChangeNeverMinimize).size(20);
+            let never_minimize_toggler = toggler(app.never_minimize)
+                .on_toggle(Message::ChangeNeverMinimize)
+                .size(20);
 
             let never_minimize_text = text("Nunca minimizar automaticamente");
             let never_minimize_row = row![never_minimize_toggler, never_minimize_text].spacing(10);
 
             main_column = main_column.push(never_minimize_row);
 
-            let seconds_to_minimize_text = text(format!("Mostrar o KC Overlay por {} segundos após carregar os jogadores", app.seconds_to_minimize));
-            let seconds_to_minimize_slider = slider(5.0..=120., app.seconds_to_minimize as f64, Message::ChangeSecondsToMinimize).width(240);
-            let seconds_to_minimize_column = column![seconds_to_minimize_text, seconds_to_minimize_slider].spacing(5);
-            
-            if !app.never_minimize{
+            let seconds_to_minimize_text = text(format!(
+                "Mostrar o KC Overlay por {} segundos após carregar os jogadores",
+                app.seconds_to_minimize
+            ));
+            let seconds_to_minimize_slider = slider(
+                5.0..=120.,
+                app.seconds_to_minimize as f64,
+                Message::ChangeSecondsToMinimize,
+            )
+            .width(240);
+            let seconds_to_minimize_column =
+                column![seconds_to_minimize_text, seconds_to_minimize_slider].spacing(5);
+
+            if !app.never_minimize {
                 main_column = main_column.push(seconds_to_minimize_column)
             }
 
-            let remove_eliminated_players_toggler = toggler(app.remove_eliminated_players).on_toggle(Message::ChangeRemoveEliminatedPlayers).size(20);
-            let remove_eliminated_players_text = text("Remover jogadores que forem eliminados da partida");
-            let remove_eliminated_players_row = row![remove_eliminated_players_toggler, remove_eliminated_players_text].spacing(10);
+            let remove_eliminated_players_toggler = toggler(app.remove_eliminated_players)
+                .on_toggle(Message::ChangeRemoveEliminatedPlayers)
+                .size(20);
+            let remove_eliminated_players_text =
+                text("Remover jogadores que forem eliminados da partida");
+            let remove_eliminated_players_row = row![
+                remove_eliminated_players_toggler,
+                remove_eliminated_players_text
+            ]
+            .spacing(10);
 
             main_column = main_column.push(remove_eliminated_players_row);
 
