@@ -84,7 +84,8 @@ struct KCOverlay {
     player_getter_sender: Option<mpsc::Sender<()>>,
     update: Update,
     never_minimize: bool,
-    seconds_to_minimize: u64
+    seconds_to_minimize: u64,
+    remove_eliminated_players: bool
 }
 
 // Mensagens enviadas para o programa saber quando atualizar variáveis, executar funções, e etc.
@@ -106,7 +107,8 @@ enum Message {
     CustomClientPathModified(String),
     SearchExplorer,
     ChangeNeverMinimize(bool),
-    ChangeSecondsToMinimize(f64)
+    ChangeSecondsToMinimize(f64),
+    ChangeRemoveEliminatedPlayers(bool)
 }
 
 // Lógica principal do programa.
@@ -135,6 +137,7 @@ impl KCOverlay {
         };
         let never_minimize = config["never_minimize"].as_bool().unwrap_or(false);
         let seconds_to_minimize = config["seconds_to_minimize"].as_u64().unwrap_or(10);
+        let remove_eliminated_players = config["remove_eliminated_players"].as_bool().unwrap_or(true);
 
         let screen = if is_first_use {
             Screen::Welcome
@@ -152,7 +155,8 @@ impl KCOverlay {
                 player_getter_sender: None,
                 update: Update::empty(),
                 never_minimize,
-                seconds_to_minimize
+                seconds_to_minimize,
+                remove_eliminated_players
             },
             Task::batch(vec![Task::perform(
                 update::check_updates(),
@@ -175,6 +179,14 @@ impl KCOverlay {
 
             Message::Log(log_reader) => match log_reader {
                 LogReader::Log(message) => {
+                    // Checa se algum jogador que está na lista foi eliminado da partida.
+                    if message.contains("KILL FINAL"){
+                        for (index, player) in self.players.clone().iter().enumerate(){
+                            if message.contains(&format!("{} morreu", player.username)) && self.remove_eliminated_players{
+                                self.players.remove(index);
+                            }
+                        }
+                    }
                     // Checa se a mensagem possui a lista de jogadores de quando o jogador digita "/jogando".
                     if message.contains("[CHAT] Jogadores") {
                         let split = message.split("):").map(|x| x.to_string());
@@ -388,13 +400,18 @@ impl KCOverlay {
             }
             Message::ChangeNeverMinimize(bool) => {
                 self.never_minimize = bool;
-                config::save_settings(Some(bool), None);
+                config::save_settings(Some(bool), None, None);
                 Task::none()
             }
             Message::ChangeSecondsToMinimize(f_seconds) => {
                 let u_seconds = f_seconds as u64;
                 self.seconds_to_minimize = u_seconds;
-                config::save_settings(None, Some(u_seconds));
+                config::save_settings(None, Some(u_seconds), None);
+                Task::none()
+            },
+            Message::ChangeRemoveEliminatedPlayers(bool) => {
+                self.remove_eliminated_players = bool;
+                config::save_settings(None, None, Some(bool));
                 Task::none()
             },
         }

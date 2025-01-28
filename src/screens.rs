@@ -166,6 +166,12 @@ pub fn get_screen(
                 main_column = main_column.push(seconds_to_minimize_column)
             }
 
+            let remove_eliminated_players_toggler = toggler(app.remove_eliminated_players).on_toggle(Message::ChangeRemoveEliminatedPlayers).size(20);
+            let remove_eliminated_players_text = text("Remover jogadores que forem eliminados da partida");
+            let remove_eliminated_players_row = row![remove_eliminated_players_toggler, remove_eliminated_players_text].spacing(10);
+
+            main_column = main_column.push(remove_eliminated_players_row);
+
             column![main_column, go_back].padding(10).spacing(10)
         }
         Screen::Welcome => {
