@@ -50,7 +50,7 @@ pub fn get_screen(
             if !players.is_empty() {
                 username_column = username_column.push(text("Nome"));
                 winstreak_column = winstreak_column.push(text("WS"));
-                winrate_column = winrate_column.push(text("Winrate"));
+                winrate_column = winrate_column.push(text("WLR"));
                 fkdr_column = fkdr_column.push(text("FKDR"));
             }
             for player in players {
