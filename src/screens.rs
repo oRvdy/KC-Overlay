@@ -44,6 +44,7 @@ pub fn get_screen(
             let mut winstreak_column = Column::new().align_x(Alignment::Center);
             let mut winrate_column = Column::new().align_x(Alignment::Center);
             let mut fkdr_column = Column::new().align_x(Alignment::Center);
+            let mut kdr_column = Column::new().align_x(Alignment::Center);
 
             let players = app.players.clone();
 
@@ -52,6 +53,7 @@ pub fn get_screen(
                 winstreak_column = winstreak_column.push(text("WS"));
                 winrate_column = winrate_column.push(text("WLR"));
                 fkdr_column = fkdr_column.push(text("FKDR"));
+                kdr_column = kdr_column.push(text("KDR"));
             }
             for player in players {
                 let clan = if let Some(value) = &player.clan {
@@ -78,10 +80,10 @@ pub fn get_screen(
 
                 let username_widget = text(player.username).color(player.username_color.to_color());
                 let clan_widget = text(clan).color(player.clan_color.to_color());
-                let (winstreak_widget, winrate_widget, fkdr) = if player.is_nicked || player.is_possible_cheater{
-                    (text(""), text(""), text(""))
+                let (winstreak_widget, winrate_widget, fkdr, kdr) = if player.is_nicked || player.is_possible_cheater{
+                    (text(""), text(""), text(""), text(""))
                 }else {
-                    (text(format!("{}", player.winstreak)), text(format!("{:.2}", player.winrate)), text(format!("{:.2}", player.final_kill_final_death_ratio)))
+                    (text(format!("{}", player.winstreak)), text(format!("{:.2}", player.winrate)), text(format!("{:.2}", player.final_kill_final_death_ratio)), text(format!("{:.2}", player.kill_death_ratio)))
                 }; 
 
                 let username_row = row![level_widget, username_widget, clan_widget].spacing(5);
@@ -90,12 +92,14 @@ pub fn get_screen(
                 winstreak_column = winstreak_column.push(winstreak_widget);
                 winrate_column = winrate_column.push(winrate_widget);
                 fkdr_column = fkdr_column.push(fkdr);
+                kdr_column = kdr_column.push(kdr)
             }
             let column_row = row![
                 username_column,
                 winstreak_column,
                 winrate_column,
-                fkdr_column
+                fkdr_column,
+                kdr_column
             ]
             .spacing(15);
             let container = container(column_row);

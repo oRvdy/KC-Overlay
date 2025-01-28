@@ -639,6 +639,8 @@ fn get_players(str_player_list: Vec<String>) -> impl Stream<Item = PlayerSender>
                     bedwars_stats["final_kills"].as_i64().unwrap_or(0) as f32
                         / bedwars_stats["final_deaths"].as_i64().unwrap_or(0) as f32;
 
+                let kill_death_ratio = bedwars_stats["kills"].as_i64().unwrap_or(0) as f32 / bedwars_stats["deaths"].as_i64().unwrap_or(0) as f32;
+
                 output
                     .send(PlayerSender::Player(Player::new(
                         i,
@@ -650,6 +652,7 @@ fn get_players(str_player_list: Vec<String>) -> impl Stream<Item = PlayerSender>
                         Rgb::from_hex(clan_color),
                         winrate,
                         final_kill_final_death_ratio,
+                        kill_death_ratio,
                         Rgb::from_minecraft_color(&level_color),
                     )))
                     .await
@@ -690,6 +693,7 @@ struct Player {
     is_possible_cheater: bool,
     winrate: f32,
     final_kill_final_death_ratio: f32,
+    kill_death_ratio: f32,
     level_color: Rgb,
 }
 
@@ -705,6 +709,7 @@ impl Player {
         clan_color: Rgb,
         winrate: f32,
         final_kill_final_death_ratio: f32,
+        kill_death_ratio: f32,
         level_color: Rgb,
     ) -> Self {
         Player {
@@ -719,6 +724,7 @@ impl Player {
             is_possible_cheater: false,
             winrate,
             final_kill_final_death_ratio,
+            kill_death_ratio,
             level_color,
         }
     }
@@ -736,6 +742,7 @@ impl Player {
             is_possible_cheater: false,
             winrate: 0.,
             final_kill_final_death_ratio: 0.,
+            kill_death_ratio: 0.,
             level_color: Rgb::new(0, 255, 255),
         }
     }
@@ -753,6 +760,7 @@ impl Player {
             is_possible_cheater: true,
             winrate: 0.,
             final_kill_final_death_ratio: 0.,
+            kill_death_ratio: 0.,
             level_color: Rgb::new(0, 255, 255),
         }
     }
