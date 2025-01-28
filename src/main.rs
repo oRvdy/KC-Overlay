@@ -629,10 +629,7 @@ fn get_players(str_player_list: Vec<String>) -> impl Stream<Item = PlayerSender>
                     .unwrap()
                     .to_string();
 
-                let level_color = bedwars_stats["level_badge"]["hex_color"]
-                    .as_str()
-                    .unwrap_or("#ffffff")
-                    .to_string();
+                let level_color = level_symbol_raw.chars().nth(1).unwrap();
 
                 let winstreak = bedwars_stats["winstreak"].as_i64().unwrap_or(0);
 
@@ -653,7 +650,7 @@ fn get_players(str_player_list: Vec<String>) -> impl Stream<Item = PlayerSender>
                         Rgb::from_hex(clan_color),
                         winrate,
                         final_kill_final_death_ratio,
-                        Rgb::from_hex(&level_color),
+                        Rgb::from_minecraft_color(&level_color),
                     )))
                     .await
                     .unwrap();
