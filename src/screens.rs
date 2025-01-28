@@ -187,7 +187,7 @@ pub fn get_screen(
                 .on_toggle(Message::ChangeRemoveEliminatedPlayers)
                 .size(20);
             let remove_eliminated_players_text =
-                text("Remover jogadores que forem eliminados da partida");
+                text("Remover jogadores assim que forem eliminados da partida");
             let remove_eliminated_players_row = row![
                 remove_eliminated_players_toggler,
                 remove_eliminated_players_text
