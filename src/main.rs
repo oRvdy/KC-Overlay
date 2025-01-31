@@ -665,13 +665,13 @@ fn get_players(str_player_list: Vec<String>) -> impl Stream<Item = PlayerSender>
                 let mut kill_death_ratio = bedwars_stats["kills"].as_i64().unwrap_or(0) as f32
                     / bedwars_stats["deaths"].as_i64().unwrap_or(0) as f32;
 
-                if winrate.is_nan() {
+                if winrate.is_nan() || winrate.is_infinite() {
                     winrate = 0.0;
                 }
-                if final_kill_final_death_ratio.is_nan() {
+                if final_kill_final_death_ratio.is_nan() || final_kill_final_death_ratio.is_infinite() {
                     final_kill_final_death_ratio = 0.0;
                 }
-                if kill_death_ratio.is_nan() {
+                if kill_death_ratio.is_nan() || kill_death_ratio.is_infinite() {
                     kill_death_ratio = 0.0;
                 }
 
