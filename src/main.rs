@@ -22,13 +22,12 @@ use iced::{
     window::{self, Position, Settings},
     Color, Element, Font, Point, Size, Subscription, Task,
 };
-use reqwest::Client;
+use player::Player;
 use screens::Screen;
-use serde_json::Value;
 use tokio::time::sleep;
-use util::Rgb;
 
 mod config;
+mod player;
 mod screens;
 mod themed_widgets;
 mod update;
@@ -85,7 +84,7 @@ struct KCOverlay {
     update: Update,
     never_minimize: bool,
     seconds_to_minimize: u64,
-    remove_eliminated_players: bool,
+    auto_manage_players: bool,
 }
 
 // Mensagens enviadas para o programa saber quando atualizar variáveis, executar funções, e etc.
@@ -137,9 +136,7 @@ impl KCOverlay {
         };
         let never_minimize = config["never_minimize"].as_bool().unwrap_or(false);
         let seconds_to_minimize = config["seconds_to_minimize"].as_u64().unwrap_or(10);
-        let remove_eliminated_players = config["remove_eliminated_players"]
-            .as_bool()
-            .unwrap_or(true);
+        let auto_manage_players = config["auto_manage_players"].as_bool().unwrap_or(true);
 
         let screen = if is_first_use {
             Screen::Welcome
@@ -158,7 +155,7 @@ impl KCOverlay {
                 update: Update::empty(),
                 never_minimize,
                 seconds_to_minimize,
-                remove_eliminated_players,
+                auto_manage_players,
             },
             Task::batch(vec![Task::perform(
                 update::check_updates(),
@@ -181,16 +178,44 @@ impl KCOverlay {
 
             Message::Log(log_reader) => match log_reader {
                 LogReader::Log(message) => {
-                    // Checa se algum jogador que está na lista foi eliminado da partida.
-                    if message.contains("KILL FINAL") {
-                        for (index, player) in self.players.clone().iter().enumerate() {
-                            if message.contains(&format!("{} morreu", player.username))
-                                && self.remove_eliminated_players
-                            {
-                                self.players.remove(index);
+                    // Checa se algum jogador entrou na partida.
+                    if self.auto_manage_players {
+                        if message.contains("entrou na sala") && !self.players.is_empty() {
+                            // com certeza não é a maneira mais eficiente de fazer isso!
+                            let splitted_message: Vec<&str> = message.split(" ").collect();
+                            for (index, part) in splitted_message.clone().into_iter().enumerate() {
+                                if part == "entrou" {
+                                    let player_name = splitted_message[index - 1];
+                                    let player =
+                                        block_on(async { player::get_player(player_name).await });
+
+                                    if let Ok(ok) = player {
+                                        self.players.push(ok);
+                                        self.players
+                                            .sort_by(|a, b| b.level.partial_cmp(&a.level).unwrap());
+                                        self.players.truncate(16);
+                                    }
+                                }
+                            }
+                        }
+                        // Checa se o jogador saiu da sala
+                        else if message.contains("saiu da sala") {
+                            for (index, player) in self.players.clone().iter().enumerate() {
+                                if message.contains(&player.username) {
+                                    self.players.remove(index);
+                                }
+                            }
+                        }
+                        // Checa se algum jogador que está na lista foi eliminado da partida.
+                        else if message.contains("KILL FINAL") {
+                            for (index, player) in self.players.clone().iter().enumerate() {
+                                if message.contains(&format!("{} morreu", player.username)) {
+                                    self.players.remove(index);
+                                }
                             }
                         }
                     }
+
                     // Checa se a mensagem possui a lista de jogadores de quando o jogador digita "/jogando".
                     if message.contains("[CHAT] Jogadores") {
                         let split = message.split("):").map(|x| x.to_string());
@@ -208,9 +233,10 @@ impl KCOverlay {
                         self.loading = true;
 
                         Task::batch(vec![
-                            Task::run(get_players(str_players), |player_sender: PlayerSender| {
-                                Message::PlayerSender(player_sender)
-                            }),
+                            Task::run(
+                                player::get_players(str_players),
+                                |player_sender: PlayerSender| Message::PlayerSender(player_sender),
+                            ),
                             window::get_latest().and_then(|x| {
                                 window::set_level(x, iced::window::Level::AlwaysOnTop)
                             }),
@@ -230,14 +256,12 @@ impl KCOverlay {
             Message::ChangeLevel => {
                 if self.loading {
                     Task::none()
+                } else if self.never_minimize {
+                    Task::none()
                 } else {
-                    if self.never_minimize {
-                        Task::none()
-                    } else {
-                        Task::batch(vec![
-                            window::get_latest().and_then(|x| window::minimize(x, true))
-                        ])
-                    }
+                    Task::batch(vec![
+                        window::get_latest().and_then(|x| window::minimize(x, true))
+                    ])
                 }
             }
             // Arrasta a janela quando o botão do mouse está segurado.
@@ -415,7 +439,7 @@ impl KCOverlay {
                 Task::none()
             }
             Message::ChangeRemoveEliminatedPlayers(bool) => {
-                self.remove_eliminated_players = bool;
+                self.auto_manage_players = bool;
                 config::save_settings(None, None, Some(bool));
                 Task::none()
             }
@@ -565,223 +589,8 @@ enum PlayerSender {
     Done,
 }
 
-// Pega os stats dos players da API do Mush.
-fn get_players(str_player_list: Vec<String>) -> impl Stream<Item = PlayerSender> {
-    stream::channel(100, |mut output| async move {
-        let (sender, mut receiver) = mpsc::channel(100);
-
-        output.send(PlayerSender::Sender(sender)).await.unwrap();
-        let client = Client::new();
-        const MUSH_API: &str = "https://mush.com.br/api/player/";
-
-        let mut interrupted = false;
-
-        for i in str_player_list {
-            let url = format!("{}{}", MUSH_API, i);
-            let request = match client.get(url).send().await {
-                Ok(response) => match response.text().await {
-                    Ok(ok) => ok,
-                    Err(e) => {
-                        println!("Failed to get text of {i}'s API response: {e}\n Skipping.");
-                        continue;
-                    }
-                },
-                Err(e) => {
-                    println!("Failed to get {i} response: {e}\n Skipping.");
-                    continue;
-                }
-            };
-
-            println!("Getting {i} stats...");
-
-            let json: Value = match serde_json::from_str(&request) {
-                Ok(ok) => ok,
-                Err(e) => {
-                    println!("{i}: {e}");
-                    continue;
-                }
-            };
-
-            if !json["success"].as_bool().unwrap() {
-                output
-                    .send(PlayerSender::Player(Player::new_nicked(i.to_string())))
-                    .await
-                    .unwrap();
-                continue;
-            }
-            let response = json["response"].clone();
-
-            let is_possible_cheater = if response["last_login"].as_i64().unwrap()
-                - response["first_login"].as_i64().unwrap()
-                < 7200000
-            {
-                true
-            } else {
-                false
-            };
-
-            let username_color = response["rank_tag"]["color"].as_str().unwrap();
-            let (clan, clan_color) = if response["clan"].is_object() {
-                (
-                    Some(response["clan"]["tag"].as_str().unwrap().to_string()),
-                    response["clan"]["tag_color"].as_str().unwrap(),
-                )
-            } else {
-                (None, "#ffffff")
-            };
-
-            let bedwars_stats = response["stats"]["bedwars"].clone();
-            if bedwars_stats.is_object() {
-                let level = if !is_possible_cheater {
-                    bedwars_stats["level"].as_i64().unwrap_or(0)
-                } else {
-                    998
-                };
-                let level_symbol_raw: String = bedwars_stats["level_badge"]["format"]
-                    .as_str()
-                    .unwrap()
-                    .to_string();
-
-                let level_symbol = level_symbol_raw
-                    .chars()
-                    .find(|c| {
-                        !c.is_ascii_alphanumeric()
-                            && !c.is_ascii_whitespace()
-                            && !c.is_ascii_punctuation()
-                    })
-                    .unwrap()
-                    .to_string();
-
-                let level_color = level_symbol_raw.chars().nth(1).unwrap();
-
-                let winstreak = bedwars_stats["winstreak"].as_i64().unwrap_or(0);
-
-                let mut winrate = bedwars_stats["wins"].as_i64().unwrap_or(0) as f32
-                    / bedwars_stats["losses"].as_i64().unwrap_or(0) as f32;
-                let mut final_kill_final_death_ratio =
-                    bedwars_stats["final_kills"].as_i64().unwrap_or(0) as f32
-                        / bedwars_stats["final_deaths"].as_i64().unwrap_or(0) as f32;
-
-                let mut kill_death_ratio = bedwars_stats["kills"].as_i64().unwrap_or(0) as f32
-                    / bedwars_stats["deaths"].as_i64().unwrap_or(0) as f32;
-
-                if winrate.is_nan() || winrate.is_infinite() {
-                    winrate = 0.0;
-                }
-                if final_kill_final_death_ratio.is_nan() || final_kill_final_death_ratio.is_infinite() {
-                    final_kill_final_death_ratio = 0.0;
-                }
-                if kill_death_ratio.is_nan() || kill_death_ratio.is_infinite() {
-                    kill_death_ratio = 0.0;
-                }
-
-                output
-                    .send(PlayerSender::Player(Player::new(
-                        i,
-                        Rgb::from_hex(username_color),
-                        level as i32,
-                        level_symbol,
-                        winstreak as i32,
-                        clan,
-                        Rgb::from_hex(clan_color),
-                        is_possible_cheater,
-                        winrate,
-                        final_kill_final_death_ratio,
-                        kill_death_ratio,
-                        Rgb::from_minecraft_color(&level_color),
-                    )))
-                    .await
-                    .unwrap();
-            }
-            /*
-             * Verifica se a lógica principal quer parar a obtenção de stats.
-             * Isso acontece quando o jogador digita /jogando enquanto este código está sendo executado.
-             */
-            if receiver.try_next().is_ok() {
-                interrupted = true;
-                break;
-            }
-            // Espera um tempo antes de conseguir os stats do próximo player. Isso é pra não saturar a API do Mush.
-            sleep(Duration::from_millis(50)).await;
-        }
-        if !interrupted {
-            output.send(PlayerSender::Done).await.unwrap();
-        }
-    })
-}
-
 async fn update_client(mut sender: Sender<MineClient>, client: MineClient) {
     sender.send(client).await.unwrap();
-}
-
-// Estrutura dos stats de um player
-#[derive(Debug, Clone)]
-struct Player {
-    username: String,
-    username_color: Rgb,
-    level: i32,
-    level_symbol: String,
-    winstreak: i32,
-    clan: Option<String>,
-    clan_color: Rgb,
-    is_nicked: bool,
-    is_possible_cheater: bool,
-    winrate: f32,
-    final_kill_final_death_ratio: f32,
-    kill_death_ratio: f32,
-    level_color: Rgb,
-}
-
-// Funções para construir uma estrutura de player
-impl Player {
-    fn new(
-        username: String,
-        username_color: Rgb,
-        level: i32,
-        level_symbol: String,
-        winstreak: i32,
-        clan: Option<String>,
-        clan_color: Rgb,
-        is_possible_cheater: bool,
-        winrate: f32,
-        final_kill_final_death_ratio: f32,
-        kill_death_ratio: f32,
-        level_color: Rgb,
-    ) -> Self {
-        Player {
-            username,
-            username_color,
-            level,
-            level_symbol,
-            winstreak,
-            clan,
-            clan_color,
-            is_nicked: false,
-            is_possible_cheater,
-            winrate,
-            final_kill_final_death_ratio,
-            kill_death_ratio,
-            level_color,
-        }
-    }
-
-    fn new_nicked(username: String) -> Self {
-        Player {
-            username,
-            username_color: Rgb::new(0, 255, 255),
-            level: 999,
-            level_symbol: "?".to_string(),
-            winstreak: 0,
-            clan: None,
-            clan_color: Rgb::new(0, 0, 0),
-            is_nicked: true,
-            is_possible_cheater: false,
-            winrate: 0.,
-            final_kill_final_death_ratio: 0.,
-            kill_death_ratio: 0.,
-            level_color: Rgb::new(0, 255, 255),
-        }
-    }
 }
 
 // Clients

@@ -54,9 +54,9 @@ pub fn check_config_file() -> bool {
                 serde_json::to_value(12).unwrap(),
             );
         }
-        if !map.contains_key("remove_eliminated_players") {
+        if !map.contains_key("auto_manage_players") {
             map.insert(
-                "remove_eliminated_players".to_owned(),
+                "auto_manage_players".to_owned(),
                 serde_json::to_value(true).unwrap(),
             );
         }
@@ -72,7 +72,7 @@ pub fn check_config_file() -> bool {
 pub fn save_settings(
     never_minimize: Option<bool>,
     seconds_to_minimize: Option<u64>,
-    remove_eliminated_players: Option<bool>,
+    auto_manage_players: Option<bool>,
 ) {
     let mut config = get_config();
 
@@ -82,8 +82,8 @@ pub fn save_settings(
     if let Some(seconds) = seconds_to_minimize {
         config["seconds_to_minimize"] = serde_json::json!(seconds)
     }
-    if let Some(remove_eliminated_players_option) = remove_eliminated_players {
-        config["remove_eliminated_players"] = serde_json::json!(remove_eliminated_players_option)
+    if let Some(auto_manage_players_option) = auto_manage_players {
+        config["auto_manage_players"] = serde_json::json!(auto_manage_players_option)
     }
 
     let mut config_file = OpenOptions::new()

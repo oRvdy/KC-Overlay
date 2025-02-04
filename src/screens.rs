@@ -183,18 +183,15 @@ pub fn get_screen(
                 main_column = main_column.push(seconds_to_minimize_column)
             }
 
-            let remove_eliminated_players_toggler = toggler(app.remove_eliminated_players)
+            let auto_manage_players_toggler = toggler(app.auto_manage_players)
                 .on_toggle(Message::ChangeRemoveEliminatedPlayers)
                 .size(20);
-            let remove_eliminated_players_text =
-                text("Remover jogadores assim que forem eliminados da partida");
-            let remove_eliminated_players_row = row![
-                remove_eliminated_players_toggler,
-                remove_eliminated_players_text
-            ]
-            .spacing(10);
+            let auto_manage_players_text =
+                text("Adicionar e remover jogadores automaticamente (ainda é necessário digitar o comando antes da partida iniciar)");
+            let auto_manage_players_row =
+                row![auto_manage_players_toggler, auto_manage_players_text].spacing(10);
 
-            main_column = main_column.push(remove_eliminated_players_row);
+            main_column = main_column.push(auto_manage_players_row);
 
             column![main_column, go_back].padding(10).spacing(10)
         }
