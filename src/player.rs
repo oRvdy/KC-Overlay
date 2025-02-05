@@ -80,6 +80,22 @@ impl Player {
     }
 }
 
+// Estrutura de Player detalhada
+pub struct DetailedPlayer {
+    pub player: Player,
+    pub is_connected: bool,
+    pub wins: u64,
+    pub losses: u64,
+    pub kills: u64,
+    pub deaths: u64,
+    pub final_kills: u64,
+    pub final_deaths: u64,
+    pub hours_played: u64,
+    pub account_creation: i64,
+    pub last_login: i64,
+    pub assists: u64,
+}
+
 // Pega os stats dos players da API do Mush.
 pub fn get_players(str_player_list: Vec<String>) -> impl Stream<Item = PlayerSender> {
     stream::channel(100, |mut output| async move {
@@ -181,6 +197,75 @@ pub async fn get_player(username: &str) -> Result<Player, ()> {
     let response = json["response"].clone();
 
     Ok(get_player_data(username.to_owned(), response))
+}
+
+pub async fn get_detailed_player(username: &str) -> Result<DetailedPlayer, ()> {
+    let client = Client::new();
+    let url = "https://mush.com.br/api/player/".to_string() + username;
+
+    let request = match client.get(url).send().await {
+        Ok(response) => match response.text().await {
+            Ok(ok) => ok,
+            Err(e) => {
+                println!("Failed to get text of {username}'s API response: {e}\n Skipping.");
+                return Err(());
+            }
+        },
+        Err(e) => {
+            println!("Failed to get {username} response: {e}\n Skipping.");
+            return Err(());
+        }
+    };
+
+    println!("Getting {username} stats...");
+
+    let json: Value = match serde_json::from_str(&request) {
+        Ok(ok) => ok,
+        Err(e) => {
+            println!("{username}: {e}");
+            return Err(());
+        }
+    };
+
+    if !json["success"].as_bool().unwrap() {
+        return Err(());
+    }
+    let response = json["response"].clone();
+
+    let basic_player_data = get_player_data(username.to_owned(), response.clone());
+
+    let account_creation = response["first_login"].as_i64().unwrap();
+    let last_login = response["last_login"].as_i64().unwrap();
+    let is_connected = response["connected"].as_bool().unwrap();
+
+    let bedwars_stats = response["stats"]["bedwars"].clone();
+
+    let wins = bedwars_stats["wins"].as_u64().unwrap();
+    let losses = bedwars_stats["losses"].as_u64().unwrap();
+    let kills = bedwars_stats["kills"].as_u64().unwrap();
+    let deaths = bedwars_stats["deaths"].as_u64().unwrap();
+    let final_kills = bedwars_stats["final_kills"].as_u64().unwrap_or(0);
+    let final_deaths = bedwars_stats["final_deaths"].as_u64().unwrap_or(0);
+    let assists = bedwars_stats["assists"].as_u64().unwrap();
+    let hours_played = response["stats"]["play_time"]["bedwars"]
+        .as_u64()
+        .unwrap_or(1)
+        / 3600;
+
+    Ok(DetailedPlayer {
+        player: basic_player_data,
+        is_connected,
+        wins,
+        losses,
+        kills,
+        deaths,
+        final_kills,
+        final_deaths,
+        hours_played,
+        account_creation,
+        last_login,
+        assists,
+    })
 }
 
 fn get_player_data(username: String, response: Value) -> Player {

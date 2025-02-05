@@ -16,6 +16,7 @@ serde_json = "1.0"
 tokio = { version = "1", features = ["full"] }
 open = "5.3.2"
 rfd = "0.15.2"
+chrono = "0.4"
 
 [target.'cfg(windows)'.build-dependencies]
 winres = "0.1.12"

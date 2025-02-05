@@ -22,7 +22,7 @@ use iced::{
     window::{self, Position, Settings},
     Color, Element, Font, Point, Size, Subscription, Task,
 };
-use player::Player;
+use player::{DetailedPlayer, Player};
 use screens::Screen;
 use tokio::time::sleep;
 
@@ -52,7 +52,7 @@ fn main() {
         .decorations(false)
         .transparent(true)
         .window(Settings {
-            size: Size::new(640., 460.),
+            size: Size::new(745., 460.),
             position: Position::Specific(Point::new(0., 50.)),
             resizable: false,
             decorations: false,
@@ -85,6 +85,8 @@ struct KCOverlay {
     never_minimize: bool,
     seconds_to_minimize: u64,
     auto_manage_players: bool,
+    player_to_view_username: String,
+    searched_player: Option<DetailedPlayer>,
 }
 
 // Mensagens enviadas para o programa saber quando atualizar variáveis, executar funções, e etc.
@@ -108,6 +110,8 @@ enum Message {
     ChangeNeverMinimize(bool),
     ChangeSecondsToMinimize(f64),
     ChangeRemoveEliminatedPlayers(bool),
+    ViewPlayerInputChanged(String),
+    ViewPlayer,
 }
 
 // Lógica principal do programa.
@@ -156,6 +160,8 @@ impl KCOverlay {
                 never_minimize,
                 seconds_to_minimize,
                 auto_manage_players,
+                player_to_view_username: String::new(),
+                searched_player: None,
             },
             Task::batch(vec![Task::perform(
                 update::check_updates(),
@@ -441,6 +447,22 @@ impl KCOverlay {
             Message::ChangeRemoveEliminatedPlayers(bool) => {
                 self.auto_manage_players = bool;
                 config::save_settings(None, None, Some(bool));
+                Task::none()
+            }
+            Message::ViewPlayerInputChanged(text) => {
+                self.player_to_view_username = text;
+                Task::none()
+            }
+            Message::ViewPlayer => {
+                match block_on(async {
+                    player::get_detailed_player(&self.player_to_view_username).await
+                }) {
+                    Ok(player) => {
+                        self.searched_player = Some(player);
+                    }
+                    Err(_) => (),
+                }
+
                 Task::none()
             }
         }

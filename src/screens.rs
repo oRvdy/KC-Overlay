@@ -3,12 +3,14 @@
 use iced::{
     theme,
     widget::{column, container, row, text, Column},
-    Alignment, Color, Font, Renderer,
+    Alignment, Color, Font, Length, Renderer,
 };
 
 use crate::{
-    themed_widgets::{button, pick_list, secondary_button, slider, text_input, toggler},
-    Message, MineClient,
+    themed_widgets::{
+        button, pick_list, red_button, secondary_button, slider, text_input, toggler,
+    },
+    util, Message, MineClient,
 };
 
 #[derive(Clone, Copy, Default, Debug)]
@@ -18,6 +20,7 @@ pub enum Screen {
     Settings,
     Welcome,
     Info,
+    ViewPlayer,
 }
 
 pub fn get_screen(
@@ -113,15 +116,22 @@ pub fn get_screen(
 
             let settings =
                 button("Configurações").on_press(Message::ChangeScreen(Screen::Settings));
-            let close = button("Sair").on_press(Message::Close);
+            let close = red_button("Sair").on_press(Message::Close);
             let minimize = button("Minimizar").on_press(Message::Minimize);
             let info = button("Sobre").on_press(Message::ChangeScreen(Screen::Info));
+            let view_player =
+                button("Ver jogador").on_press(Message::ChangeScreen(Screen::ViewPlayer));
 
-            let mut bottom_row = row![settings, info, minimize, close].spacing(20);
+            let mut left_bottom_row = row![settings, view_player, info]
+                .spacing(15)
+                .width(Length::Fill);
+            let right_bottom_row = row![minimize, close].spacing(15);
             if app.update.available {
                 let update_button = secondary_button("Atualizar").on_press(Message::Update);
-                bottom_row = bottom_row.push(update_button);
+                left_bottom_row = left_bottom_row.push(update_button);
             }
+
+            let bottom_row = row![left_bottom_row, right_bottom_row].spacing(20);
 
             let main_column = column![bar, container].spacing(10).height(COLUMN_HEIGHT);
 
@@ -244,6 +254,114 @@ pub fn get_screen(
             let credits_column = column![creditos, github].spacing(10);
 
             let main_column = column![discord_column, credits_column].height(COLUMN_HEIGHT);
+
+            column![main_column, go_back].spacing(10).padding(10)
+        }
+        Screen::ViewPlayer => {
+            let input = text_input("Nome do jogador", &app.player_to_view_username)
+                .on_input(Message::ViewPlayerInputChanged);
+            let search_player = button("Ver stats").on_press(Message::ViewPlayer);
+            let input_row = row![input, search_player].spacing(10);
+            let mut main_column = column![input_row].height(COLUMN_HEIGHT).spacing(20);
+
+            let go_back = button("Voltar").on_press(Message::ChangeScreen(Screen::Main));
+
+            if let Some(player) = &app.searched_player {
+                let connected = match player.is_connected {
+                    true => text("Sim").color(Color::from_rgb8(166, 218, 149)),
+                    false => text("Não").color(Color::from_rgb8(237, 135, 150)),
+                };
+
+                let connected_row = row![text("Online:"), connected].spacing(10);
+
+                let first_login_date = format!(
+                    "Primeiro login: {}.",
+                    util::unix_time_to_date(player.account_creation)
+                );
+                let first_login_widget = text(first_login_date);
+                let last_login_date = format!(
+                    "Último login: {}.",
+                    util::unix_time_to_date(player.last_login)
+                );
+                let last_login_widget = text(last_login_date);
+
+                let hours_played = text(format!("Horas jogadas: {}", player.hours_played));
+
+                let clan = if let Some(value) = &player.player.clan {
+                    format!("[{}]", value)
+                } else {
+                    String::new()
+                };
+
+                let username_widget = text(player.player.username.clone())
+                    .color(player.player.username_color.to_color());
+                let level_widget = row![
+                    text(format!("[{}", player.player.level))
+                        .color(player.player.level_color.to_color()),
+                    text(player.player.level_symbol.clone())
+                        .font(Font::with_name("Noto Sans Symbols 2"))
+                        .color(player.player.level_color.to_color()),
+                    text("]").color(player.player.level_color.to_color())
+                ];
+                let clan_widget = text(clan).color(player.player.clan_color.to_color());
+                let (
+                    winstreak_widget,
+                    winrate_widget,
+                    fkdr,
+                    kdr,
+                    wins,
+                    losses,
+                    final_kills,
+                    final_deaths,
+                    kills,
+                    deaths,
+                    assists,
+                ) = (
+                    text(format!("Winstreak: {}", player.player.winstreak)),
+                    text(format!("WLR: {:.2}", player.player.winrate)),
+                    text(format!(
+                        "FKDR: {:.2}",
+                        player.player.final_kill_final_death_ratio
+                    )),
+                    text(format!("KDR: {:.2}", player.player.kill_death_ratio)),
+                    text(format!("Vitórias: {}", player.wins)),
+                    text(format!("Derrotas: {}", player.losses)),
+                    text(format!("Final kills: {}", player.final_kills)),
+                    text(format!("Final deaths: {}", player.final_deaths)),
+                    text(format!("Kills: {}", player.kills)),
+                    text(format!("Mortes: {}", player.deaths)),
+                    text(format!("Assistências: {}", player.assists)),
+                );
+
+                let username_row = row![level_widget, username_widget, clan_widget].spacing(5);
+
+                let left_column = column![
+                    connected_row,
+                    first_login_widget,
+                    last_login_widget,
+                    hours_played
+                ]
+                .spacing(10);
+                let middle_column =
+                    column![winstreak_widget, winrate_widget, fkdr, kdr].spacing(10);
+                let right_column = column![
+                    wins,
+                    losses,
+                    final_kills,
+                    final_deaths,
+                    kills,
+                    deaths,
+                    assists
+                ]
+                .spacing(10);
+
+                let player_column = column![
+                    username_row,
+                    row![left_column, middle_column, right_column].spacing(60)
+                ]
+                .spacing(10);
+                main_column = main_column.push(player_column);
+            }
 
             column![main_column, go_back].spacing(10).padding(10)
         }

@@ -61,6 +61,21 @@ pub fn secondary_button<'a>(
     })
 }
 
+pub fn red_button<'a>(
+    content: impl Into<iced::Element<'a, Message, Theme, Renderer>>,
+) -> iced::widget::Button<'a, Message, Theme, Renderer> {
+    iced::widget::button(content).style(move |_: &Theme, _| iced::widget::button::Style {
+        background: Some(Background::Color(Color::from_rgb8(230, 69, 83))),
+        text_color: Color::from_rgb8(255, 255, 255),
+        border: Border {
+            color: Color::from_rgb8(230, 69, 83),
+            width: 0.,
+            radius: Radius::new(10),
+        },
+        shadow: Shadow::default(),
+    })
+}
+
 pub fn pick_list<'a, T, L, V, Message>(
     options: L,
     selected: Option<V>,
