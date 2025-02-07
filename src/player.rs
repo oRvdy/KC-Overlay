@@ -240,13 +240,13 @@ pub async fn get_detailed_player(username: &str) -> Result<DetailedPlayer, ()> {
 
     let bedwars_stats = response["stats"]["bedwars"].clone();
 
-    let wins = bedwars_stats["wins"].as_u64().unwrap();
-    let losses = bedwars_stats["losses"].as_u64().unwrap();
-    let kills = bedwars_stats["kills"].as_u64().unwrap();
-    let deaths = bedwars_stats["deaths"].as_u64().unwrap();
+    let wins = bedwars_stats["wins"].as_u64().unwrap_or(0);
+    let losses = bedwars_stats["losses"].as_u64().unwrap_or(0);
+    let kills = bedwars_stats["kills"].as_u64().unwrap_or(0);
+    let deaths = bedwars_stats["deaths"].as_u64().unwrap_or(0);
     let final_kills = bedwars_stats["final_kills"].as_u64().unwrap_or(0);
     let final_deaths = bedwars_stats["final_deaths"].as_u64().unwrap_or(0);
-    let assists = bedwars_stats["assists"].as_u64().unwrap();
+    let assists = bedwars_stats["assists"].as_u64()..unwrap_or(0);
     let hours_played = response["stats"]["play_time"]["bedwars"]
         .as_u64()
         .unwrap_or(1)
