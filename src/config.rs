@@ -60,6 +60,12 @@ pub fn check_config_file() -> bool {
                 serde_json::to_value(true).unwrap(),
             );
         }
+        if !map.contains_key("stats_type") {
+            map.insert(
+                "stats_type".to_owned(),
+                serde_json::to_value("Bedwars Geral").unwrap(),
+            );
+        }
     }
 
     let serializedjson = serde_json::to_string_pretty(&conf_json).unwrap();
@@ -73,6 +79,7 @@ pub fn save_settings(
     never_minimize: Option<bool>,
     seconds_to_minimize: Option<u64>,
     auto_manage_players: Option<bool>,
+    stats_type: Option<String>,
 ) {
     let mut config = get_config();
 
@@ -84,6 +91,9 @@ pub fn save_settings(
     }
     if let Some(auto_manage_players_option) = auto_manage_players {
         config["auto_manage_players"] = serde_json::json!(auto_manage_players_option)
+    }
+    if let Some(stats_type_option) = stats_type {
+        config["stats_type"] = serde_json::json!(stats_type_option)
     }
 
     let mut config_file = OpenOptions::new()

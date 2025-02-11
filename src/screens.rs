@@ -7,6 +7,7 @@ use iced::{
 };
 
 use crate::{
+    stats::StatsType,
     themed_widgets::{
         button, pick_list, red_button, secondary_button, slider, text_input, toggler,
     },
@@ -38,7 +39,7 @@ pub fn get_screen(
             } else if app.loading {
                 String::from("Carregando jogadores...")
             } else {
-                format!("Top {} jogadores da sala", app.players.len())
+                format!("Top {} jogadores da sala ({})", app.players.len(), app.stats_type.to_string())
             };
 
             let screen_title_widget = text(screen_title_text);
@@ -61,6 +62,25 @@ pub fn get_screen(
                 kdr_column = kdr_column.push(text("KDR"));
             }
             for player in players {
+                let (
+                    level,
+                    level_symbol,
+                    level_color,
+                    winstreak,
+                    winrate,
+                    final_kill_death_ratio,
+                    kill_death_ratio,
+                ) = match player.stats {
+                    crate::stats::Stats::Bedwars(bedwars) => (
+                        bedwars.level,
+                        bedwars.level_symbol,
+                        bedwars.level_color,
+                        bedwars.winstreak,
+                        bedwars.winrate,
+                        bedwars.final_kill_death_ratio,
+                        bedwars.kill_death_ratio,
+                    ),
+                };
                 let clan = if let Some(value) = &player.clan {
                     format!("[{}]", value)
                 } else {
@@ -75,11 +95,11 @@ pub fn get_screen(
                         .size(12)]
                 } else {
                     row![
-                        text(format!("[{}", player.level)).color(player.level_color.to_color()),
-                        text(player.level_symbol)
+                        text(format!("[{}", level)).color(level_color.to_color()),
+                        text(level_symbol)
                             .font(Font::with_name("Noto Sans Symbols 2"))
-                            .color(player.level_color.to_color()),
-                        text("]").color(player.level_color.to_color())
+                            .color(level_color.to_color()),
+                        text("]").color(level_color.to_color())
                     ]
                 };
 
@@ -89,10 +109,10 @@ pub fn get_screen(
                     (text("?"), text("?"), text("?"), text("?"))
                 } else {
                     (
-                        text(format!("{}", player.winstreak)),
-                        text(format!("{:.2}", player.winrate)),
-                        text(format!("{:.2}", player.final_kill_final_death_ratio)),
-                        text(format!("{:.2}", player.kill_death_ratio)),
+                        text(format!("{}", winstreak)),
+                        text(format!("{:.2}", winrate)),
+                        text(format!("{:.2}", final_kill_death_ratio)),
+                        text(format!("{:.2}", kill_death_ratio)),
                     )
                 };
 
@@ -147,12 +167,18 @@ pub fn get_screen(
                 MineClient::Silent,
                 MineClient::Custom(" ".to_string()),
             ];
+
             let client_select = pick_list(clients, Some(app.client.clone()), Message::ClientSelect);
             let client_row = row![text("Client:"), client_select].spacing(10);
 
+            let stats_select = pick_list(StatsType::get_stats_list(), Some(app.stats_type.clone()), Message::StatsSelect);
+            let stats_row = row![text("Stats:"), stats_select].spacing(10);
+
             let go_back = button("Voltar").on_press(Message::ChangeScreen(Screen::Main));
 
-            let mut main_column = column![client_row].spacing(20).height(COLUMN_HEIGHT);
+            let mut main_column = column![client_row, stats_row]
+                .spacing(20)
+                .height(COLUMN_HEIGHT);
 
             if let MineClient::Custom(path) = &app.client {
                 let custom_client_text = text("Último log do client (ex: logs/latest.log):");
@@ -260,8 +286,9 @@ pub fn get_screen(
         Screen::ViewPlayer => {
             let input = text_input("Nome do jogador", &app.player_to_view_username)
                 .on_input(Message::ViewPlayerInputChanged);
+            let stats_pick_list = pick_list(StatsType::get_stats_list(), Some(app.searched_player_stats_type.clone()), Message::ViewPlayerStatsChanged);
             let search_player = button("Ver stats").on_press(Message::ViewPlayer);
-            let input_row = row![input, search_player].spacing(10);
+            let input_row = row![input, stats_pick_list, search_player].spacing(10);
             let mut main_column = column![input_row].height(COLUMN_HEIGHT).spacing(20);
 
             let go_back = button("Voltar").on_press(Message::ChangeScreen(Screen::Main));
@@ -285,81 +312,85 @@ pub fn get_screen(
                 );
                 let last_login_widget = text(last_login_date);
 
-                let hours_played = text(format!("Horas jogadas: {}", player.hours_played));
-
-                let clan = if let Some(value) = &player.player.clan {
+                let clan = if let Some(value) = &player.clan {
                     format!("[{}]", value)
                 } else {
                     String::new()
                 };
 
-                let username_widget = text(player.player.username.clone())
-                    .color(player.player.username_color.to_color());
-                let level_widget = row![
-                    text(format!("[{}", player.player.level))
-                        .color(player.player.level_color.to_color()),
-                    text(player.player.level_symbol.clone())
-                        .font(Font::with_name("Noto Sans Symbols 2"))
-                        .color(player.player.level_color.to_color()),
-                    text("]").color(player.player.level_color.to_color())
-                ];
-                let clan_widget = text(clan).color(player.player.clan_color.to_color());
-                let (
-                    winstreak_widget,
-                    winrate_widget,
-                    fkdr,
-                    kdr,
-                    wins,
-                    losses,
-                    final_kills,
-                    final_deaths,
-                    kills,
-                    deaths,
-                    assists,
-                ) = (
-                    text(format!("Winstreak: {}", player.player.winstreak)),
-                    text(format!("WLR: {:.2}", player.player.winrate)),
-                    text(format!(
-                        "FKDR: {:.2}",
-                        player.player.final_kill_final_death_ratio
-                    )),
-                    text(format!("KDR: {:.2}", player.player.kill_death_ratio)),
-                    text(format!("Vitórias: {}", player.wins)),
-                    text(format!("Derrotas: {}", player.losses)),
-                    text(format!("Final kills: {}", player.final_kills)),
-                    text(format!("Final deaths: {}", player.final_deaths)),
-                    text(format!("Kills: {}", player.kills)),
-                    text(format!("Mortes: {}", player.deaths)),
-                    text(format!("Assistências: {}", player.assists)),
-                );
+                let username_widget =
+                    text(player.username.clone()).color(player.username_color.to_color());
+                let clan_widget = text(clan).color(player.clan_color.to_color());
 
-                let username_row = row![level_widget, username_widget, clan_widget].spacing(5);
+                let player_column = match &player.stats {
+                    crate::stats::Stats::Bedwars(bedwars) => {
+                        let hours_played = text(format!("Horas jogadas: {}", bedwars.hours_played));
 
-                let left_column = column![
-                    connected_row,
-                    first_login_widget,
-                    last_login_widget,
-                    hours_played
-                ]
-                .spacing(10);
-                let middle_column =
-                    column![winstreak_widget, winrate_widget, fkdr, kdr].spacing(10);
-                let right_column = column![
-                    wins,
-                    losses,
-                    final_kills,
-                    final_deaths,
-                    kills,
-                    deaths,
-                    assists
-                ]
-                .spacing(10);
+                        let level_widget = row![
+                            text(format!("[{}", bedwars.level))
+                                .color(bedwars.level_color.to_color()),
+                            text(bedwars.level_symbol.clone())
+                                .font(Font::with_name("Noto Sans Symbols 2"))
+                                .color(bedwars.level_color.to_color()),
+                            text("]").color(bedwars.level_color.to_color())
+                        ];
+                        let (
+                            winstreak_widget,
+                            winrate_widget,
+                            fkdr,
+                            kdr,
+                            wins,
+                            losses,
+                            final_kills,
+                            final_deaths,
+                            kills,
+                            deaths,
+                            assists,
+                        ) = (
+                            text(format!("Winstreak: {}", bedwars.winstreak)),
+                            text(format!("WLR: {:.2}", bedwars.winrate)),
+                            text(format!("FKDR: {:.2}", bedwars.final_kill_death_ratio)),
+                            text(format!("KDR: {:.2}", bedwars.kill_death_ratio)),
+                            text(format!("Vitórias: {}", bedwars.wins)),
+                            text(format!("Derrotas: {}", bedwars.losses)),
+                            text(format!("Final kills: {}", bedwars.final_kills)),
+                            text(format!("Final deaths: {}", bedwars.final_deaths)),
+                            text(format!("Kills: {}", bedwars.kills)),
+                            text(format!("Mortes: {}", bedwars.deaths)),
+                            text(format!("Assistências: {}", bedwars.assists)),
+                        );
 
-                let player_column = column![
-                    username_row,
-                    row![left_column, middle_column, right_column].spacing(60)
-                ]
-                .spacing(10);
+                        let username_row =
+                            row![level_widget, username_widget, clan_widget].spacing(5);
+
+                        let left_column = column![
+                            connected_row,
+                            first_login_widget,
+                            last_login_widget,
+                            hours_played
+                        ]
+                        .spacing(10);
+                        let middle_column =
+                            column![winstreak_widget, winrate_widget, fkdr, kdr].spacing(10);
+                        let right_column = column![
+                            wins,
+                            losses,
+                            final_kills,
+                            final_deaths,
+                            kills,
+                            deaths,
+                            assists
+                        ]
+                        .spacing(10);
+
+                        column![
+                            username_row,
+                            row![left_column, middle_column, right_column].spacing(60)
+                        ]
+                        .spacing(10)
+                    }
+                };
+
                 main_column = main_column.push(player_column);
             }
 

@@ -22,13 +22,15 @@ use iced::{
     window::{self, Position, Settings},
     Color, Element, Font, Point, Size, Subscription, Task,
 };
-use player::{DetailedPlayer, Player};
+use player::Player;
 use screens::Screen;
+use stats::{Stats, StatsType};
 use tokio::time::sleep;
 
 mod config;
 mod player;
 mod screens;
+mod stats;
 mod themed_widgets;
 mod update;
 mod util;
@@ -86,7 +88,9 @@ struct KCOverlay {
     seconds_to_minimize: u64,
     auto_manage_players: bool,
     player_to_view_username: String,
-    searched_player: Option<DetailedPlayer>,
+    searched_player: Option<Player>,
+    searched_player_stats_type: StatsType,
+    stats_type: StatsType,
 }
 
 // Mensagens enviadas para o programa saber quando atualizar variáveis, executar funções, e etc.
@@ -111,7 +115,9 @@ enum Message {
     ChangeSecondsToMinimize(f64),
     ChangeRemoveEliminatedPlayers(bool),
     ViewPlayerInputChanged(String),
+    ViewPlayerStatsChanged(StatsType),
     ViewPlayer,
+    StatsSelect(StatsType),
 }
 
 // Lógica principal do programa.
@@ -141,6 +147,8 @@ impl KCOverlay {
         let never_minimize = config["never_minimize"].as_bool().unwrap_or(false);
         let seconds_to_minimize = config["seconds_to_minimize"].as_u64().unwrap_or(10);
         let auto_manage_players = config["auto_manage_players"].as_bool().unwrap_or(true);
+        let stats_type_str = config["stats_type"].as_str().unwrap_or("Bedwars Geral");
+        let stats_type = StatsType::from_string(stats_type_str);
 
         let screen = if is_first_use {
             Screen::Welcome
@@ -162,6 +170,8 @@ impl KCOverlay {
                 auto_manage_players,
                 player_to_view_username: String::new(),
                 searched_player: None,
+                searched_player_stats_type: StatsType::BedwarsAll,
+                stats_type,
             },
             Task::batch(vec![Task::perform(
                 update::check_updates(),
@@ -192,14 +202,13 @@ impl KCOverlay {
                             for (index, part) in splitted_message.clone().into_iter().enumerate() {
                                 if part == "entrou" {
                                     let player_name = splitted_message[index - 1];
-                                    let player =
-                                        block_on(async { player::get_player(player_name).await });
+                                    let player = block_on(async {
+                                        player::get_player(player_name, self.stats_type.clone())
+                                            .await
+                                    });
 
                                     if let Ok(ok) = player {
-                                        self.players.push(ok);
-                                        self.players
-                                            .sort_by(|a, b| b.level.partial_cmp(&a.level).unwrap());
-                                        self.players.truncate(16);
+                                        self.add_player(ok);
                                     }
                                 }
                             }
@@ -240,7 +249,7 @@ impl KCOverlay {
 
                         Task::batch(vec![
                             Task::run(
-                                player::get_players(str_players),
+                                player::get_players(str_players, self.stats_type.clone()),
                                 |player_sender: PlayerSender| Message::PlayerSender(player_sender),
                             ),
                             window::get_latest().and_then(|x| {
@@ -334,10 +343,7 @@ impl KCOverlay {
             // Gerencia o output do código responsável por ler os logs.
             Message::PlayerSender(player_sender) => match player_sender {
                 PlayerSender::Player(player) => {
-                    self.players.push(player);
-                    self.players
-                        .sort_by(|a, b| b.level.partial_cmp(&a.level).unwrap());
-                    self.players.truncate(16);
+                    self.add_player(player);
                     Task::none()
                 }
                 PlayerSender::Done => {
@@ -435,27 +441,32 @@ impl KCOverlay {
             }
             Message::ChangeNeverMinimize(bool) => {
                 self.never_minimize = bool;
-                config::save_settings(Some(bool), None, None);
+                config::save_settings(Some(bool), None, None, None);
                 Task::none()
             }
             Message::ChangeSecondsToMinimize(f_seconds) => {
                 let u_seconds = f_seconds as u64;
                 self.seconds_to_minimize = u_seconds;
-                config::save_settings(None, Some(u_seconds), None);
+                config::save_settings(None, Some(u_seconds), None, None);
                 Task::none()
             }
             Message::ChangeRemoveEliminatedPlayers(bool) => {
                 self.auto_manage_players = bool;
-                config::save_settings(None, None, Some(bool));
+                config::save_settings(None, None, Some(bool), None);
                 Task::none()
             }
             Message::ViewPlayerInputChanged(text) => {
                 self.player_to_view_username = text;
                 Task::none()
             }
+            Message::ViewPlayerStatsChanged(stats_type) => {
+                self.searched_player_stats_type = stats_type;
+                Task::none()
+            },
+
             Message::ViewPlayer => {
                 match block_on(async {
-                    player::get_detailed_player(&self.player_to_view_username).await
+                    player::get_player(&self.player_to_view_username, self.searched_player_stats_type.clone()).await
                 }) {
                     Ok(player) => {
                         self.searched_player = Some(player);
@@ -463,6 +474,12 @@ impl KCOverlay {
                     Err(_) => (),
                 }
 
+                Task::none()
+            }
+            Message::StatsSelect(stats_type) => {
+                self.stats_type = stats_type.clone();
+                self.players.clear();
+                config::save_settings(None, None, None, Some(stats_type.to_string()));
                 Task::none()
             }
         }
@@ -487,6 +504,20 @@ impl KCOverlay {
 
     fn scale_factor(&self) -> f64 {
         1.0
+    }
+
+    fn add_player(&mut self, player: Player) {
+        self.players.push(player);
+        self.players.sort_by(|a, b| {
+            let b_level = match &b.stats {
+                Stats::Bedwars(bedwars) => bedwars.level,
+            };
+            let a_level = match &a.stats {
+                Stats::Bedwars(bedwars) => bedwars.level,
+            };
+            b_level.partial_cmp(&a_level).unwrap()
+        });
+        self.players.truncate(16);
     }
 }
 
