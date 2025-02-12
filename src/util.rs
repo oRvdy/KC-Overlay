@@ -1,10 +1,10 @@
 // Código para funções essenciais
 
 use std::{
-    fs::{self, File},
+    fs::File,
     io::Read,
     path::Path,
-    time::{Duration, SystemTime},
+    time::Duration,
 };
 
 use chrono::DateTime;

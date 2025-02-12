@@ -282,7 +282,7 @@ fn get_player_data(username: String, response: Value, stats_type: StatsType) -> 
                     ("4v4v4v4_winstreak", "4v4v4v4_wins", "4v4v4v4_losses", "4v4v4v4_kills", "4v4v4v4_deaths", "4v4v4v4_final_kills", "4v4v4v4_final_deaths", "4v4v4v4_assists", "bedwars_4v4v4v4")
 
                 },
-                _ => panic!("Impossível!"),
+                //_ => panic!("Impossível!"),
             };
 
             let winstreak = bedwars_stats[ws_entry].as_i64().unwrap_or(0) as i32;
