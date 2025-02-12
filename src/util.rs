@@ -63,25 +63,7 @@ pub fn lunar_get_newer_logs_path() -> String {
         _ => panic!("System not supported."),
     };
 
-    let logs_path = format!("{}/logs/game", lunar_dir);
-
-    fs::create_dir_all(logs_path.clone()).unwrap();
-
-    let mut newer_log_path = String::new();
-    let mut shortest_modification_time = SystemTime::UNIX_EPOCH;
-    for log in fs::read_dir(logs_path).unwrap() {
-        let log = log.unwrap();
-        let metadata = log.metadata().unwrap();
-
-        let modified_time = metadata.modified().unwrap();
-        if modified_time > shortest_modification_time {
-            newer_log_path = log.path().to_string_lossy().to_string();
-            shortest_modification_time = modified_time;
-        }
-    }
-
-    println!("{}", newer_log_path);
-    newer_log_path
+    format!("{}/offline/multiver/logs/latest.log", lunar_dir)
 }
 
 #[derive(Debug, Clone)]
