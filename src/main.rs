@@ -91,6 +91,7 @@ struct KCOverlay {
     searched_player: Option<Player>,
     searched_player_stats_type: StatsType,
     stats_type: StatsType,
+    window_scale: f64
 }
 
 // Mensagens enviadas para o programa saber quando atualizar variáveis, executar funções, e etc.
@@ -118,6 +119,7 @@ enum Message {
     ViewPlayerStatsChanged(StatsType),
     ViewPlayer,
     StatsSelect(StatsType),
+    WindowScaleChanged(f64)
 }
 
 // Lógica principal do programa.
@@ -149,6 +151,7 @@ impl KCOverlay {
         let auto_manage_players = config["auto_manage_players"].as_bool().unwrap_or(true);
         let stats_type_str = config["stats_type"].as_str().unwrap_or("Bedwars Geral");
         let stats_type = StatsType::from_string(stats_type_str);
+        let window_scale = config["window_scale"].as_f64().unwrap_or(1.0);
 
         let screen = if is_first_use {
             Screen::Welcome
@@ -172,11 +175,14 @@ impl KCOverlay {
                 searched_player: None,
                 searched_player_stats_type: StatsType::BedwarsAll,
                 stats_type,
+                window_scale,
             },
             Task::batch(vec![Task::perform(
                 update::check_updates(),
                 Message::CheckedUpdates,
-            )]),
+            ),
+            window::get_latest().and_then(move |x| window::resize(x, Size::new(745. * window_scale as f32, 460. * window_scale as f32)))
+            ]),
         )
     }
 
@@ -441,18 +447,18 @@ impl KCOverlay {
             }
             Message::ChangeNeverMinimize(bool) => {
                 self.never_minimize = bool;
-                config::save_settings(Some(bool), None, None, None);
+                config::save_settings(Some(bool), None, None, None, None);
                 Task::none()
             }
             Message::ChangeSecondsToMinimize(f_seconds) => {
                 let u_seconds = f_seconds as u64;
                 self.seconds_to_minimize = u_seconds;
-                config::save_settings(None, Some(u_seconds), None, None);
+                config::save_settings(None, Some(u_seconds), None, None, None);
                 Task::none()
             }
             Message::ChangeRemoveEliminatedPlayers(bool) => {
                 self.auto_manage_players = bool;
-                config::save_settings(None, None, Some(bool), None);
+                config::save_settings(None, None, Some(bool), None, None);
                 Task::none()
             }
             Message::ViewPlayerInputChanged(text) => {
@@ -479,9 +485,15 @@ impl KCOverlay {
             Message::StatsSelect(stats_type) => {
                 self.stats_type = stats_type.clone();
                 self.players.clear();
-                config::save_settings(None, None, None, Some(stats_type.to_string()));
+                config::save_settings(None, None, None, Some(stats_type.to_string()),  None);
                 Task::none()
             }
+            Message::WindowScaleChanged(scale) => {
+                let scale = scale / 100.;
+                self.window_scale = scale;
+                config::save_settings(None, None, None, None, Some(scale));
+                window::get_latest().and_then(move |x| window::resize(x, Size::new(745. * scale as f32, 460. * scale as f32)))
+            },
         }
     }
 
@@ -503,7 +515,7 @@ impl KCOverlay {
     }
 
     fn scale_factor(&self) -> f64 {
-        1.0
+        self.window_scale
     }
 
     fn add_player(&mut self, player: Player) {

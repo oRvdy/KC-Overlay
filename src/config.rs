@@ -66,6 +66,12 @@ pub fn check_config_file() -> bool {
                 serde_json::to_value("Bedwars Geral").unwrap(),
             );
         }
+        if !map.contains_key("window_scale") {
+            map.insert(
+                "window_scale".to_owned(),
+                serde_json::to_value(1.0).unwrap(),
+            );
+        }
     }
 
     let serializedjson = serde_json::to_string_pretty(&conf_json).unwrap();
@@ -80,6 +86,7 @@ pub fn save_settings(
     seconds_to_minimize: Option<u64>,
     auto_manage_players: Option<bool>,
     stats_type: Option<String>,
+    window_scale: Option<f64>
 ) {
     let mut config = get_config();
 
@@ -94,6 +101,9 @@ pub fn save_settings(
     }
     if let Some(stats_type_option) = stats_type {
         config["stats_type"] = serde_json::json!(stats_type_option)
+    }
+    if let Some(scale) = window_scale {
+        config["window_scale"] = serde_json::json!(scale)
     }
 
     let mut config_file = OpenOptions::new()

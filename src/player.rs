@@ -263,25 +263,61 @@ fn get_player_data(username: String, response: Value, stats_type: StatsType) -> 
                 assists_entry,
                 hours_played_entry,
             ) = match stats_type {
-                StatsType::BedwarsAll => {
-                    ("winstreak", "wins", "losses", "kills", "deaths", "final_kills", "final_deaths", "assists", "bedwars")
-                }
-                StatsType::BedwarsSolo => {
-                    ("solo_winstreak", "solo_wins", "solo_losses", "solo_kills", "solo_deaths", "solo_final_kills", "solo_final_deaths", "solo_assists", "bedwars_solo")
-
-                }
-                StatsType::BedwarsDoubles => {
-                    ("doubles_winstreak", "doubles_wins", "doubles_losses", "doubles_kills", "doubles_deaths", "doubles_final_kills", "doubles_final_deaths", "doubles_assists", "bedwars_doubles")
-
-                },
-                StatsType::BedwarsTrios => {
-                    ("3v3v3v3_winstreak", "3v3v3v3_wins", "3v3v3v3_losses", "3v3v3v3_kills", "3v3v3v3_deaths", "3v3v3v3_final_kills", "3v3v3v3_final_deaths", "3v3v3v3_assists", "bedwars_3v3v3v3")
-
-                },
-                StatsType::BedwarsQuads => {
-                    ("4v4v4v4_winstreak", "4v4v4v4_wins", "4v4v4v4_losses", "4v4v4v4_kills", "4v4v4v4_deaths", "4v4v4v4_final_kills", "4v4v4v4_final_deaths", "4v4v4v4_assists", "bedwars_4v4v4v4")
-
-                },
+                StatsType::BedwarsAll => (
+                    "winstreak",
+                    "wins",
+                    "losses",
+                    "kills",
+                    "deaths",
+                    "final_kills",
+                    "final_deaths",
+                    "assists",
+                    "bedwars",
+                ),
+                StatsType::BedwarsSolo => (
+                    "solo_winstreak",
+                    "solo_wins",
+                    "solo_losses",
+                    "solo_kills",
+                    "solo_deaths",
+                    "solo_final_kills",
+                    "solo_final_deaths",
+                    "solo_assists",
+                    "bedwars_solo",
+                ),
+                StatsType::BedwarsDoubles => (
+                    "doubles_winstreak",
+                    "doubles_wins",
+                    "doubles_losses",
+                    "doubles_kills",
+                    "doubles_deaths",
+                    "doubles_final_kills",
+                    "doubles_final_deaths",
+                    "doubles_assists",
+                    "bedwars_doubles",
+                ),
+                StatsType::BedwarsTrios => (
+                    "3v3v3v3_winstreak",
+                    "3v3v3v3_wins",
+                    "3v3v3v3_losses",
+                    "3v3v3v3_kills",
+                    "3v3v3v3_deaths",
+                    "3v3v3v3_final_kills",
+                    "3v3v3v3_final_deaths",
+                    "3v3v3v3_assists",
+                    "bedwars_3v3v3v3",
+                ),
+                StatsType::BedwarsQuads => (
+                    "4v4v4v4_winstreak",
+                    "4v4v4v4_wins",
+                    "4v4v4v4_losses",
+                    "4v4v4v4_kills",
+                    "4v4v4v4_deaths",
+                    "4v4v4v4_final_kills",
+                    "4v4v4v4_final_deaths",
+                    "4v4v4v4_assists",
+                    "bedwars_4v4v4v4",
+                ),
                 //_ => panic!("Impossível!"),
             };
 
@@ -289,9 +325,9 @@ fn get_player_data(username: String, response: Value, stats_type: StatsType) -> 
 
             let mut winrate = bedwars_stats[wins_entry].as_i64().unwrap_or(0) as f32
                 / bedwars_stats[losses_entry].as_i64().unwrap_or(0) as f32;
-            let mut final_kill_death_ratio =
-                bedwars_stats[final_kills_entry].as_i64().unwrap_or(0) as f32
-                    / bedwars_stats[final_deaths_entry].as_i64().unwrap_or(0) as f32;
+            let mut final_kill_death_ratio = bedwars_stats[final_kills_entry].as_i64().unwrap_or(0)
+                as f32
+                / bedwars_stats[final_deaths_entry].as_i64().unwrap_or(0) as f32;
 
             let mut kill_death_ratio = bedwars_stats[kills_entry].as_i64().unwrap_or(0) as f32
                 / bedwars_stats[deaths_entry].as_i64().unwrap_or(0) as f32;

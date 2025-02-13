@@ -61,7 +61,13 @@ impl StatsType {
         }
     }
 
-    pub fn get_stats_list() -> Vec<StatsType>{
-        vec![StatsType::BedwarsAll, StatsType::BedwarsSolo, StatsType::BedwarsDoubles, StatsType::BedwarsTrios, StatsType::BedwarsQuads]
+    pub fn get_stats_list() -> Vec<StatsType> {
+        vec![
+            StatsType::BedwarsAll,
+            StatsType::BedwarsSolo,
+            StatsType::BedwarsDoubles,
+            StatsType::BedwarsTrios,
+            StatsType::BedwarsQuads,
+        ]
     }
 }

@@ -39,7 +39,11 @@ pub fn get_screen(
             } else if app.loading {
                 String::from("Carregando jogadores...")
             } else {
-                format!("Top {} jogadores da sala ({})", app.players.len(), app.stats_type.to_string())
+                format!(
+                    "Top {} jogadores da sala ({})",
+                    app.players.len(),
+                    app.stats_type.to_string()
+                )
             };
 
             let screen_title_widget = text(screen_title_text);
@@ -171,7 +175,11 @@ pub fn get_screen(
             let client_select = pick_list(clients, Some(app.client.clone()), Message::ClientSelect);
             let client_row = row![text("Client:"), client_select].spacing(10);
 
-            let stats_select = pick_list(StatsType::get_stats_list(), Some(app.stats_type.clone()), Message::StatsSelect);
+            let stats_select = pick_list(
+                StatsType::get_stats_list(),
+                Some(app.stats_type.clone()),
+                Message::StatsSelect,
+            );
             let stats_row = row![text("Stats:"), stats_select].spacing(10);
 
             let go_back = button("Voltar").on_press(Message::ChangeScreen(Screen::Main));
@@ -227,7 +235,12 @@ pub fn get_screen(
             let auto_manage_players_row =
                 row![auto_manage_players_toggler, auto_manage_players_text].spacing(10);
 
+            let window_scale_slider = slider(50.0..=125., app.window_scale * 100., Message::WindowScaleChanged);
+            let window_scale_row = row![text(format!("Tamanho da janela ({}x):", app.window_scale)), window_scale_slider].spacing(10);
+
             main_column = main_column.push(auto_manage_players_row);
+            main_column = main_column.push(window_scale_row);
+
 
             column![main_column, go_back].padding(10).spacing(10)
         }
@@ -286,7 +299,11 @@ pub fn get_screen(
         Screen::ViewPlayer => {
             let input = text_input("Nome do jogador", &app.player_to_view_username)
                 .on_input(Message::ViewPlayerInputChanged);
-            let stats_pick_list = pick_list(StatsType::get_stats_list(), Some(app.searched_player_stats_type.clone()), Message::ViewPlayerStatsChanged);
+            let stats_pick_list = pick_list(
+                StatsType::get_stats_list(),
+                Some(app.searched_player_stats_type.clone()),
+                Message::ViewPlayerStatsChanged,
+            );
             let search_player = button("Ver stats").on_press(Message::ViewPlayer);
             let input_row = row![input, stats_pick_list, search_player].spacing(10);
             let mut main_column = column![input_row].height(COLUMN_HEIGHT).spacing(20);

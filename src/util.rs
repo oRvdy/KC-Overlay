@@ -1,11 +1,6 @@
 // Código para funções essenciais
 
-use std::{
-    fs::File,
-    io::Read,
-    path::Path,
-    time::Duration,
-};
+use std::{fs::File, io::Read, path::Path, time::Duration};
 
 use chrono::DateTime;
 use iced::Color;
