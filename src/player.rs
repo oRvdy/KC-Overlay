@@ -1,12 +1,11 @@
-use std::time::Duration;
-
 use iced::{
-    futures::{channel::mpsc, SinkExt, Stream},
+    futures::{channel::mpsc, SinkExt, Stream, future},
     stream,
 };
 use reqwest::Client;
 use serde_json::Value;
 use tokio::time::sleep;
+use std::time::Duration;
 
 use crate::{
     stats::{Bedwars, Stats, StatsType},
@@ -109,65 +108,77 @@ pub fn get_players(
 
         let mut interrupted = false;
 
-        for i in str_player_list {
-            let url = format!("{}{}", MUSH_API, i);
-            let request = match client.get(url).send().await {
-                Ok(response) => match response.text().await {
-                    Ok(ok) => ok,
-                    Err(e) => {
-                        println!("Failed to get text of {i}'s API response: {e}\n Skipping.");
-                        continue;
+        // Processa jogadores em grupos de 4 com delay de 100ms entre grupos
+        for chunk in str_player_list.chunks(4) {
+            let mut futures = Vec::new();
+            
+            // Cria futures para cada jogador no grupo
+            for player_name in chunk {
+                let client = client.clone();
+                let stats_type = stats_type.clone();
+                let url = format!("{}{}", MUSH_API, player_name);
+                
+                futures.push(async move {
+                    let request = match client.get(url).send().await {
+                        Ok(response) => match response.text().await {
+                            Ok(ok) => ok,
+                            Err(e) => {
+                                println!("Falha ao obter texto da resposta da API para {player_name}: {e}\n Pulando.");
+                                return None;
+                            }
+                        },
+                        Err(e) => {
+                            println!("Falha ao obter resposta para {player_name}: {e}\n Pulando.");
+                            return None;
+                        }
+                    };
+
+                    println!("Obtendo stats de {player_name}...");
+
+                    let json: Value = match serde_json::from_str(&request) {
+                        Ok(ok) => ok,
+                        Err(e) => {
+                            println!("{player_name}: {e}");
+                            return None;
+                        }
+                    };
+
+                    if !json["success"].as_bool().unwrap() {
+                        return Some(Player::new_nicked(player_name.to_string(), stats_type));
                     }
-                },
-                Err(e) => {
-                    println!("Failed to get {i} response: {e}\n Skipping.");
-                    continue;
-                }
-            };
 
-            println!("Getting {i} stats...");
-
-            let json: Value = match serde_json::from_str(&request) {
-                Ok(ok) => ok,
-                Err(e) => {
-                    println!("{i}: {e}");
-                    continue;
-                }
-            };
-
-            if !json["success"].as_bool().unwrap() {
-                output
-                    .send(PlayerSender::Player(Player::new_nicked(
-                        i.to_string(),
-                        stats_type.clone(),
-                    )))
-                    .await
-                    .unwrap();
-                continue;
+                    let response = json["response"].clone();
+                    Some(get_player_data(player_name.to_string(), response, stats_type))
+                });
             }
-            let response = json["response"].clone();
 
-            let player = get_player_data(i, response, stats_type.clone());
+            // Executa o grupo de futures concorrentemente
+            let results = future::join_all(futures).await;
+            
+            // Envia resultados para thread principal
+            for player in results.into_iter().flatten() {
+                if receiver.try_next().is_ok() {
+                    interrupted = true;
+                    break;
+                }
+                output.send(PlayerSender::Player(player)).await.unwrap();
+            }
 
-            output.send(PlayerSender::Player(player)).await.unwrap();
-            /*
-             * Verifica se a lógica principal quer parar a obtenção de stats.
-             * Isso acontece quando o jogador digita /jogando enquanto este código está sendo executado.
-             */
-            if receiver.try_next().is_ok() {
-                interrupted = true;
+            if interrupted {
                 break;
             }
-            // Espera um tempo antes de conseguir os stats do próximo player. Isso é pra não saturar a API do Mush.
-            sleep(Duration::from_millis(50)).await;
+
+            // Delay entre grupos para respeitar rate limit
+            sleep(Duration::from_millis(100)).await;
         }
+
         if !interrupted {
             output.send(PlayerSender::Done).await.unwrap();
         }
     })
 }
 
-// Versão mais simples para pegar os dados de apenas um jogador.
+// Versão mais pega os dados de apenas um jogador.
 pub async fn get_player(username: &str, stats_type: StatsType) -> Result<Player, ()> {
     let client = Client::new();
     let url = "https://mush.com.br/api/player/".to_string() + username;
@@ -263,61 +274,25 @@ fn get_player_data(username: String, response: Value, stats_type: StatsType) -> 
                 assists_entry,
                 hours_played_entry,
             ) = match stats_type {
-                StatsType::BedwarsAll => (
-                    "winstreak",
-                    "wins",
-                    "losses",
-                    "kills",
-                    "deaths",
-                    "final_kills",
-                    "final_deaths",
-                    "assists",
-                    "bedwars",
-                ),
-                StatsType::BedwarsSolo => (
-                    "solo_winstreak",
-                    "solo_wins",
-                    "solo_losses",
-                    "solo_kills",
-                    "solo_deaths",
-                    "solo_final_kills",
-                    "solo_final_deaths",
-                    "solo_assists",
-                    "bedwars_solo",
-                ),
-                StatsType::BedwarsDoubles => (
-                    "doubles_winstreak",
-                    "doubles_wins",
-                    "doubles_losses",
-                    "doubles_kills",
-                    "doubles_deaths",
-                    "doubles_final_kills",
-                    "doubles_final_deaths",
-                    "doubles_assists",
-                    "bedwars_doubles",
-                ),
-                StatsType::BedwarsTrios => (
-                    "3v3v3v3_winstreak",
-                    "3v3v3v3_wins",
-                    "3v3v3v3_losses",
-                    "3v3v3v3_kills",
-                    "3v3v3v3_deaths",
-                    "3v3v3v3_final_kills",
-                    "3v3v3v3_final_deaths",
-                    "3v3v3v3_assists",
-                    "bedwars_3v3v3v3",
-                ),
-                StatsType::BedwarsQuads => (
-                    "4v4v4v4_winstreak",
-                    "4v4v4v4_wins",
-                    "4v4v4v4_losses",
-                    "4v4v4v4_kills",
-                    "4v4v4v4_deaths",
-                    "4v4v4v4_final_kills",
-                    "4v4v4v4_final_deaths",
-                    "4v4v4v4_assists",
-                    "bedwars_4v4v4v4",
-                ),
+                StatsType::BedwarsAll => {
+                    ("winstreak", "wins", "losses", "kills", "deaths", "final_kills", "final_deaths", "assists", "bedwars")
+                }
+                StatsType::BedwarsSolo => {
+                    ("solo_winstreak", "solo_wins", "solo_losses", "solo_kills", "solo_deaths", "solo_final_kills", "solo_final_deaths", "solo_assists", "bedwars_solo")
+
+                }
+                StatsType::BedwarsDoubles => {
+                    ("doubles_winstreak", "doubles_wins", "doubles_losses", "doubles_kills", "doubles_deaths", "doubles_final_kills", "doubles_final_deaths", "doubles_assists", "bedwars_doubles")
+
+                },
+                StatsType::BedwarsTrios => {
+                    ("3v3v3v3_winstreak", "3v3v3v3_wins", "3v3v3v3_losses", "3v3v3v3_kills", "3v3v3v3_deaths", "3v3v3v3_final_kills", "3v3v3v3_final_deaths", "3v3v3v3_assists", "bedwars_3v3v3v3")
+
+                },
+                StatsType::BedwarsQuads => {
+                    ("4v4v4v4_winstreak", "4v4v4v4_wins", "4v4v4v4_losses", "4v4v4v4_kills", "4v4v4v4_deaths", "4v4v4v4_final_kills", "4v4v4v4_final_deaths", "4v4v4v4_assists", "bedwars_4v4v4v4")
+
+                },
                 //_ => panic!("Impossível!"),
             };
 
@@ -325,9 +300,9 @@ fn get_player_data(username: String, response: Value, stats_type: StatsType) -> 
 
             let mut winrate = bedwars_stats[wins_entry].as_i64().unwrap_or(0) as f32
                 / bedwars_stats[losses_entry].as_i64().unwrap_or(0) as f32;
-            let mut final_kill_death_ratio = bedwars_stats[final_kills_entry].as_i64().unwrap_or(0)
-                as f32
-                / bedwars_stats[final_deaths_entry].as_i64().unwrap_or(0) as f32;
+            let mut final_kill_death_ratio =
+                bedwars_stats[final_kills_entry].as_i64().unwrap_or(0) as f32
+                    / bedwars_stats[final_deaths_entry].as_i64().unwrap_or(0) as f32;
 
             let mut kill_death_ratio = bedwars_stats[kills_entry].as_i64().unwrap_or(0) as f32
                 / bedwars_stats[deaths_entry].as_i64().unwrap_or(0) as f32;
