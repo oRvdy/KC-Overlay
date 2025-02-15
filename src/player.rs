@@ -1,11 +1,11 @@
 use iced::{
-    futures::{channel::mpsc, SinkExt, Stream, future},
+    futures::{channel::mpsc, future, SinkExt, Stream},
     stream,
 };
 use reqwest::Client;
 use serde_json::Value;
-use tokio::time::sleep;
-use std::time::Duration;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 use crate::{
     stats::{Bedwars, Stats, StatsType},
@@ -107,33 +107,43 @@ pub fn get_players(
         const MUSH_API: &str = "https://mush.com.br/api/player/";
 
         let mut interrupted = false;
+        let rate_limited_arc = Arc::new(Mutex::new(false));
 
-        // Processa jogadores em grupos de 4 com delay de 100ms entre grupos
+        // Processa jogadores em grupos de 4
         for chunk in str_player_list.chunks(4) {
             let mut futures = Vec::new();
-            
+
             // Cria futures para cada jogador no grupo
             for player_name in chunk {
                 let client = client.clone();
                 let stats_type = stats_type.clone();
                 let url = format!("{}{}", MUSH_API, player_name);
-                
+
+                let rate_limited = Arc::clone(&rate_limited_arc);
+
                 futures.push(async move {
                     let request = match client.get(url).send().await {
-                        Ok(response) => match response.text().await {
+                        Ok(response) => {
+                            let rate_limit = response.headers().get("x-ratelimit-remaining").unwrap().to_str().unwrap().parse().unwrap_or(0);
+                            if rate_limit < 1{
+                                let mut rate_limited = rate_limited.lock().await;
+                                *rate_limited = true;
+                                println!("Esperar até podermos consultar a API novamente.");
+                                return None;
+                            }
+                            match response.text().await {
                             Ok(ok) => ok,
                             Err(e) => {
                                 println!("Falha ao obter texto da resposta da API para {player_name}: {e}\n Pulando.");
                                 return None;
                             }
-                        },
+                        }
+                    },
                         Err(e) => {
                             println!("Falha ao obter resposta para {player_name}: {e}\n Pulando.");
                             return None;
                         }
                     };
-
-                    println!("Obtendo stats de {player_name}...");
 
                     let json: Value = match serde_json::from_str(&request) {
                         Ok(ok) => ok,
@@ -150,11 +160,17 @@ pub fn get_players(
                     let response = json["response"].clone();
                     Some(get_player_data(player_name.to_string(), response, stats_type))
                 });
+
+                let rate_limited_outer = Arc::clone(&rate_limited_arc);
+
+                if *rate_limited_outer.lock().await {
+                    break;
+                }
             }
 
             // Executa o grupo de futures concorrentemente
             let results = future::join_all(futures).await;
-            
+
             // Envia resultados para thread principal
             for player in results.into_iter().flatten() {
                 if receiver.try_next().is_ok() {
@@ -164,21 +180,20 @@ pub fn get_players(
                 output.send(PlayerSender::Player(player)).await.unwrap();
             }
 
-            if interrupted {
+            if interrupted || *rate_limited_arc.lock().await {
                 break;
             }
-
-            // Delay entre grupos para respeitar rate limit
-            sleep(Duration::from_millis(100)).await;
         }
-
+        if *rate_limited_arc.lock().await {
+            output.send(PlayerSender::WaitOrder).await.unwrap()
+        }
         if !interrupted {
             output.send(PlayerSender::Done).await.unwrap();
         }
     })
 }
 
-// Versão mais pega os dados de apenas um jogador.
+// Coleta os stats de apenas um jogador.
 pub async fn get_player(username: &str, stats_type: StatsType) -> Result<Player, ()> {
     let client = Client::new();
     let url = "https://mush.com.br/api/player/".to_string() + username;
@@ -274,25 +289,61 @@ fn get_player_data(username: String, response: Value, stats_type: StatsType) -> 
                 assists_entry,
                 hours_played_entry,
             ) = match stats_type {
-                StatsType::BedwarsAll => {
-                    ("winstreak", "wins", "losses", "kills", "deaths", "final_kills", "final_deaths", "assists", "bedwars")
-                }
-                StatsType::BedwarsSolo => {
-                    ("solo_winstreak", "solo_wins", "solo_losses", "solo_kills", "solo_deaths", "solo_final_kills", "solo_final_deaths", "solo_assists", "bedwars_solo")
-
-                }
-                StatsType::BedwarsDoubles => {
-                    ("doubles_winstreak", "doubles_wins", "doubles_losses", "doubles_kills", "doubles_deaths", "doubles_final_kills", "doubles_final_deaths", "doubles_assists", "bedwars_doubles")
-
-                },
-                StatsType::BedwarsTrios => {
-                    ("3v3v3v3_winstreak", "3v3v3v3_wins", "3v3v3v3_losses", "3v3v3v3_kills", "3v3v3v3_deaths", "3v3v3v3_final_kills", "3v3v3v3_final_deaths", "3v3v3v3_assists", "bedwars_3v3v3v3")
-
-                },
-                StatsType::BedwarsQuads => {
-                    ("4v4v4v4_winstreak", "4v4v4v4_wins", "4v4v4v4_losses", "4v4v4v4_kills", "4v4v4v4_deaths", "4v4v4v4_final_kills", "4v4v4v4_final_deaths", "4v4v4v4_assists", "bedwars_4v4v4v4")
-
-                },
+                StatsType::BedwarsAll => (
+                    "winstreak",
+                    "wins",
+                    "losses",
+                    "kills",
+                    "deaths",
+                    "final_kills",
+                    "final_deaths",
+                    "assists",
+                    "bedwars",
+                ),
+                StatsType::BedwarsSolo => (
+                    "solo_winstreak",
+                    "solo_wins",
+                    "solo_losses",
+                    "solo_kills",
+                    "solo_deaths",
+                    "solo_final_kills",
+                    "solo_final_deaths",
+                    "solo_assists",
+                    "bedwars_solo",
+                ),
+                StatsType::BedwarsDoubles => (
+                    "doubles_winstreak",
+                    "doubles_wins",
+                    "doubles_losses",
+                    "doubles_kills",
+                    "doubles_deaths",
+                    "doubles_final_kills",
+                    "doubles_final_deaths",
+                    "doubles_assists",
+                    "bedwars_doubles",
+                ),
+                StatsType::BedwarsTrios => (
+                    "3v3v3v3_winstreak",
+                    "3v3v3v3_wins",
+                    "3v3v3v3_losses",
+                    "3v3v3v3_kills",
+                    "3v3v3v3_deaths",
+                    "3v3v3v3_final_kills",
+                    "3v3v3v3_final_deaths",
+                    "3v3v3v3_assists",
+                    "bedwars_3v3v3v3",
+                ),
+                StatsType::BedwarsQuads => (
+                    "4v4v4v4_winstreak",
+                    "4v4v4v4_wins",
+                    "4v4v4v4_losses",
+                    "4v4v4v4_kills",
+                    "4v4v4v4_deaths",
+                    "4v4v4v4_final_kills",
+                    "4v4v4v4_final_deaths",
+                    "4v4v4v4_assists",
+                    "bedwars_4v4v4v4",
+                ),
                 //_ => panic!("Impossível!"),
             };
 
@@ -300,9 +351,9 @@ fn get_player_data(username: String, response: Value, stats_type: StatsType) -> 
 
             let mut winrate = bedwars_stats[wins_entry].as_i64().unwrap_or(0) as f32
                 / bedwars_stats[losses_entry].as_i64().unwrap_or(0) as f32;
-            let mut final_kill_death_ratio =
-                bedwars_stats[final_kills_entry].as_i64().unwrap_or(0) as f32
-                    / bedwars_stats[final_deaths_entry].as_i64().unwrap_or(0) as f32;
+            let mut final_kill_death_ratio = bedwars_stats[final_kills_entry].as_i64().unwrap_or(0)
+                as f32
+                / bedwars_stats[final_deaths_entry].as_i64().unwrap_or(0) as f32;
 
             let mut kill_death_ratio = bedwars_stats[kills_entry].as_i64().unwrap_or(0) as f32
                 / bedwars_stats[deaths_entry].as_i64().unwrap_or(0) as f32;

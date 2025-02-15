@@ -80,6 +80,7 @@ struct KCOverlay {
     screen: Screen,
     players: Vec<Player>,
     loading: bool,
+    waiting: i32,
     client: MineClient,
     logs_sender: Option<mpsc::Sender<MineClient>>,
     player_getter_sender: Option<mpsc::Sender<()>>,
@@ -91,7 +92,7 @@ struct KCOverlay {
     searched_player: Option<Player>,
     searched_player_stats_type: StatsType,
     stats_type: StatsType,
-    window_scale: f64
+    window_scale: f64,
 }
 
 // Mensagens enviadas para o programa saber quando atualizar variáveis, executar funções, e etc.
@@ -119,7 +120,8 @@ enum Message {
     ViewPlayerStatsChanged(StatsType),
     ViewPlayer,
     StatsSelect(StatsType),
-    WindowScaleChanged(f64)
+    WindowScaleChanged(f64),
+    UpdateWaitTime,
 }
 
 // Lógica principal do programa.
@@ -164,6 +166,7 @@ impl KCOverlay {
                 screen,
                 players: vec![],
                 loading: false,
+                waiting: 0,
                 client,
                 logs_sender: None,
                 player_getter_sender: None,
@@ -177,11 +180,14 @@ impl KCOverlay {
                 stats_type,
                 window_scale,
             },
-            Task::batch(vec![Task::perform(
-                update::check_updates(),
-                Message::CheckedUpdates,
-            ),
-            window::get_latest().and_then(move |x| window::resize(x, Size::new(745. * window_scale as f32, 460. * window_scale as f32)))
+            Task::batch(vec![
+                Task::perform(update::check_updates(), Message::CheckedUpdates),
+                window::get_latest().and_then(move |x| {
+                    window::resize(
+                        x,
+                        Size::new(745. * window_scale as f32, 460. * window_scale as f32),
+                    )
+                }),
             ]),
         )
     }
@@ -238,7 +244,7 @@ impl KCOverlay {
                     }
 
                     // Checa se a mensagem possui a lista de jogadores de quando o jogador digita "/jogando".
-                    if message.contains("[CHAT] Jogadores") {
+                    if message.contains("[CHAT] Jogadores") && self.waiting < 1 {
                         let split = message.split("):").map(|x| x.to_string());
                         let split_vector: Vec<String> = split.clone().collect();
 
@@ -275,9 +281,7 @@ impl KCOverlay {
             },
             // Minimiza a janela
             Message::ChangeLevel => {
-                if self.loading {
-                    Task::none()
-                } else if self.never_minimize {
+                if self.loading || self.never_minimize {
                     Task::none()
                 } else {
                     Task::batch(vec![
@@ -370,6 +374,10 @@ impl KCOverlay {
                         }
                         None => self.player_getter_sender = Some(new_sender),
                     }
+                    Task::none()
+                }
+                PlayerSender::WaitOrder => {
+                    self.waiting = 50;
                     Task::none()
                 }
             },
@@ -468,11 +476,15 @@ impl KCOverlay {
             Message::ViewPlayerStatsChanged(stats_type) => {
                 self.searched_player_stats_type = stats_type;
                 Task::none()
-            },
+            }
 
             Message::ViewPlayer => {
                 match block_on(async {
-                    player::get_player(&self.player_to_view_username, self.searched_player_stats_type.clone()).await
+                    player::get_player(
+                        &self.player_to_view_username,
+                        self.searched_player_stats_type.clone(),
+                    )
+                    .await
                 }) {
                     Ok(player) => {
                         self.searched_player = Some(player);
@@ -485,15 +497,21 @@ impl KCOverlay {
             Message::StatsSelect(stats_type) => {
                 self.stats_type = stats_type.clone();
                 self.players.clear();
-                config::save_settings(None, None, None, Some(stats_type.to_string()),  None);
+                config::save_settings(None, None, None, Some(stats_type.to_string()), None);
                 Task::none()
             }
             Message::WindowScaleChanged(scale) => {
                 let scale = scale / 100.;
                 self.window_scale = scale;
                 config::save_settings(None, None, None, None, Some(scale));
-                window::get_latest().and_then(move |x| window::resize(x, Size::new(745. * scale as f32, 460. * scale as f32)))
-            },
+                window::get_latest().and_then(move |x| {
+                    window::resize(x, Size::new(745. * scale as f32, 460. * scale as f32))
+                })
+            }
+            Message::UpdateWaitTime => {
+                self.waiting -= 1;
+                Task::none()
+            }
         }
     }
 
@@ -511,7 +529,13 @@ impl KCOverlay {
         let client_updater =
             time::every(Duration::from_secs(20)).map(move |_| Message::ClientUpdate);
 
-        Subscription::batch(vec![event, logs_reader, client_updater])
+        let mut subscriptions = vec![event, logs_reader, client_updater];
+
+        if self.waiting > 0 {
+            subscriptions.push(time::every(Duration::from_secs(1)).map(|_| Message::UpdateWaitTime))
+        }
+
+        Subscription::batch(subscriptions)
     }
 
     fn scale_factor(&self) -> f64 {
@@ -650,6 +674,7 @@ fn get_logs_path(client: MineClient) -> String {
 #[derive(Clone, Debug)]
 enum PlayerSender {
     Player(Player),
+    WaitOrder,
     Sender(mpsc::Sender<()>),
     Done,
 }

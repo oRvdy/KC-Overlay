@@ -86,7 +86,7 @@ pub fn save_settings(
     seconds_to_minimize: Option<u64>,
     auto_manage_players: Option<bool>,
     stats_type: Option<String>,
-    window_scale: Option<f64>
+    window_scale: Option<f64>,
 ) {
     let mut config = get_config();
 

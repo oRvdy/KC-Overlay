@@ -38,11 +38,13 @@ pub fn get_screen(
                 )
             } else if app.loading {
                 String::from("Carregando jogadores...")
+            } else if app.waiting > 0 {
+                format!("Espere {} segundos para usar novamente", app.waiting)
             } else {
                 format!(
                     "Top {} jogadores da sala ({})",
                     app.players.len(),
-                    app.stats_type.to_string()
+                    app.stats_type
                 )
             };
 
@@ -235,12 +237,19 @@ pub fn get_screen(
             let auto_manage_players_row =
                 row![auto_manage_players_toggler, auto_manage_players_text].spacing(10);
 
-            let window_scale_slider = slider(50.0..=125., app.window_scale * 100., Message::WindowScaleChanged);
-            let window_scale_row = row![text(format!("Tamanho da janela ({}x):", app.window_scale)), window_scale_slider].spacing(10);
+            let window_scale_slider = slider(
+                50.0..=125.,
+                app.window_scale * 100.,
+                Message::WindowScaleChanged,
+            );
+            let window_scale_row = row![
+                text(format!("Tamanho da janela ({}x):", app.window_scale)),
+                window_scale_slider
+            ]
+            .spacing(10);
 
             main_column = main_column.push(auto_manage_players_row);
             main_column = main_column.push(window_scale_row);
-
 
             column![main_column, go_back].padding(10).spacing(10)
         }
