@@ -9,7 +9,7 @@ use iced::{
 use crate::{
     stats::StatsType,
     themed_widgets::{
-        button, pick_list, red_button, secondary_button, slider, text_input, toggler,
+        button, button_with_color, pick_list, red_button, secondary_button, slider, text_input, toggler,
     },
     util, Message, MineClient,
 };
@@ -140,13 +140,27 @@ pub fn get_screen(
             .spacing(15);
             let container = container(column_row);
 
-            let settings =
-                button("Configurações").on_press(Message::ChangeScreen(Screen::Settings));
+            let settings_btn = if app.rgb_buttons {
+                button_with_color("Configurações", app.get_rgb_color(0.0))
+            } else {
+                button("Configurações")
+            };
+            let settings = settings_btn.on_press(Message::ChangeScreen(Screen::Settings));
+
+            let view_player = if app.rgb_buttons {
+                button_with_color("Ver jogador", app.get_rgb_color(0.2))
+            } else {
+                button("Ver jogador")
+            }.on_press(Message::ChangeScreen(Screen::ViewPlayer));
+
+            let info = if app.rgb_buttons {
+                button_with_color("Sobre", app.get_rgb_color(0.4))
+            } else {
+                button("Sobre")
+            }.on_press(Message::ChangeScreen(Screen::Info));
+
             let close = red_button("Sair").on_press(Message::Close);
             let minimize = button("Minimizar").on_press(Message::Minimize);
-            let info = button("Sobre").on_press(Message::ChangeScreen(Screen::Info));
-            let view_player =
-                button("Ver jogador").on_press(Message::ChangeScreen(Screen::ViewPlayer));
 
             let mut left_bottom_row = row![settings, view_player, info]
                 .spacing(15)
@@ -247,6 +261,14 @@ pub fn get_screen(
                 window_scale_slider
             ]
             .spacing(10);
+
+            let rgb_buttons_toggler = toggler(app.rgb_buttons)
+                .on_toggle(Message::ChangeRGBButtons)
+                .size(20);
+            let rgb_buttons_text = text("Botões RGB");
+            let rgb_buttons_row = row![rgb_buttons_toggler, rgb_buttons_text].spacing(10);
+            
+            main_column = main_column.push(rgb_buttons_row);
 
             main_column = main_column.push(auto_manage_players_row);
             main_column = main_column.push(window_scale_row);
