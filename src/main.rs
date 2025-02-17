@@ -593,7 +593,7 @@ impl KCOverlay {
 
     fn get_rgb_color(&self, offset: f32) -> Color {
         let hue = (self.rgb_offset + offset) % 1.0;
-        let (r, g, b) = hsv_to_rgb(hue, 0.7, 1.0);
+        let (r, g, b) = util::hsv_to_rgb(hue, 0.7, 1.0);
         Color::from_rgb(r, g, b)
     }
 }
@@ -764,22 +764,4 @@ impl Update {
             url: String::new(),
         }
     }
-}
-
-// Função auxiliar para converter HSV para RGB
-fn hsv_to_rgb(h: f32, s: f32, v: f32) -> (f32, f32, f32) {
-    let c = v * s;
-    let x = c * (1.0 - ((h * 6.0) % 2.0 - 1.0).abs());
-    let m = v - c;
-    
-    let (r, g, b) = match (h * 6.0).floor() as i32 {
-        0 => (c, x, 0.0),
-        1 => (x, c, 0.0),
-        2 => (0.0, c, x),
-        3 => (0.0, x, c),
-        4 => (x, 0.0, c),
-        _ => (c, 0.0, x),
-    };
-
-    (r + m, g + m, b + m)
 }

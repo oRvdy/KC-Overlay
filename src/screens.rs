@@ -159,8 +159,17 @@ pub fn get_screen(
                 button("Sobre")
             }.on_press(Message::ChangeScreen(Screen::Info));
 
-            let close = red_button("Sair").on_press(Message::Close);
-            let minimize = button("Minimizar").on_press(Message::Minimize);
+            let close = if app.rgb_buttons {
+                button_with_color("Sair", app.get_rgb_color(0.8))
+            } else {
+                red_button("Sair")
+            }.on_press(Message::Close);
+
+            let minimize = if app.rgb_buttons {
+                button_with_color("Minimizar", app.get_rgb_color(0.6))
+            } else {
+                button("Minimizar")
+            }.on_press(Message::Minimize);
 
             let mut left_bottom_row = row![settings, view_player, info]
                 .spacing(15)
@@ -311,7 +320,7 @@ pub fn get_screen(
             ));
 
             let creditos = text(format!(
-                "KC Overlay {} - Criado por Jafkc2",
+                "KC Overlay {} - Criado por Jafkc2 - Desenvolvedor: oRvdy",
                 env!("CARGO_PKG_VERSION")
             ));
             let github = button("Acessar Github").on_press(Message::OpenLink(String::from(
